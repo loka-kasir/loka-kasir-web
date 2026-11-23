@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
   Camera, Save, Eye, EyeOff, Mail,
-  Phone, Building2, User, Shield, Crown, X, CheckCircle,
+  Building2, User, Shield, Crown, X, CheckCircle, MessageCircle,
 } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import ImageCropModal from '@/components/ui/ImageCropModal'
@@ -13,7 +13,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useOutletStore } from '@/store/outletStore'
 import { getUserProfile, updateBusinessInfo } from '@/api/business'
 import { getMyOutlets, getOutletConfig, updateOutletLogo, removeOutletLogo } from '@/api/outlets'
-import { changePassword, changeEmail, changePhone, sendEmailVerification, verifyEmailOtp } from '@/api/auth'
+import { changePassword, changeEmail, sendEmailVerification, updateWhatsApp, verifyEmailOtp } from '@/api/auth'
 import { getErrorMessage, toTitleCase } from '@/lib/utils'
 import { t } from '@/lib/i18n'
 import { deriveStatus } from '@/store/subscriptionStore'
@@ -154,21 +154,16 @@ function ChangeEmailModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-// ─── Change Phone Modal (password saja — nomor HP bukan jalur pemulihan) ─────
+// ─── WhatsApp Modal (tanpa password — nomor WA hanya kontak, bukan login) ────
 
-function ChangePhoneModal({ onClose }: { onClose: () => void }) {
-  const [phone, setPhone] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPass, setShowPass] = useState(false)
+function ChangeWhatsAppModal({ current, onClose }: { current?: string; onClose: () => void }) {
+  const [number, setNumber] = useState(current ? `+${current}` : '')
   const qc = useQueryClient()
-  const { setAuth, user, token } = useAuthStore()
-
   const saveMutation = useMutation({
-    mutationFn: () => changePhone(phone.trim(), password),
+    mutationFn: () => updateWhatsApp(number.trim()),
     onSuccess: () => {
-      if (user && token) setAuth({ ...user, phone_number: phone.trim() }, token)
-      qc.invalidateQueries({ queryKey: ['user-profile'] })
-      toast.success(t('profilePhoneUpdated'))
+      void qc.invalidateQueries({ queryKey: ['user-profile'] })
+      toast.success(t('profileWhatsappUpdated'))
       onClose()
     },
     onError: (err) => toast.error(getErrorMessage(err)),
@@ -178,35 +173,26 @@ function ChangePhoneModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-card rounded-2xl shadow-xl w-full max-w-sm p-6">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-foreground">{t('profileChangePhoneTitle')}</h2>
-          <button onClick={onClose} aria-label={t('actionClose')} className="p-1.5 text-muted-foreground hover:text-muted-foreground hover:bg-muted rounded-lg transition"><X size={18} /></button>
+          <h2 className="text-lg font-bold text-foreground">{t('profileChangeWhatsappTitle')}</h2>
+          <button onClick={onClose} aria-label={t('actionClose')} className="p-1.5 text-muted-foreground hover:bg-muted rounded-lg transition"><X size={18} /></button>
         </div>
-        <div className="space-y-4">
+        <Form onSubmit={(e) => { e.preventDefault(); if (number.trim()) saveMutation.mutate() }} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">{t('profileCurrentPassword')}</label>
-            <div className="relative">
-              <input type={showPass ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder={t('profileEnterPassword')} className="w-full px-4 py-2.5 border border-border rounded-xl text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <button type="button" onClick={() => setShowPass(!showPass)} aria-label={showPass ? t('loginHidePassword') : t('loginShowPassword')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">{t('profileNewPhone')}</label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t('phonePlaceholder')}
+            <input type="tel" value={number} onChange={(e) => setNumber(e.target.value.replace(/[^0-9+\-\s]/g, ''))} placeholder={t('regWhatsappPlaceholder')} required autoFocus
+              aria-label={t('profileWhatsapp')}
               className="w-full px-4 py-2.5 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            <p className="text-xs text-muted-foreground mt-1.5">{t('profilePhoneWhyPassword')}</p>
+            <p className="text-xs text-muted-foreground mt-1.5">{t('profileWhatsappHint')}</p>
           </div>
-          <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !phone || !password}
+          <button type="submit" disabled={saveMutation.isPending || !number.trim()}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition disabled:opacity-60 text-sm">
-            {saveMutation.isPending ? t('saving') : t('profileSavePhone')}
+            {saveMutation.isPending ? t('saving') : t('actionSave')}
           </button>
-        </div>
+        </Form>
       </div>
     </div>
   )
 }
+
 
 // ─── Change Password Modal ────────────────────────────────────────────────────
 
@@ -296,7 +282,7 @@ export default function ProfilePage() {
   const [showChangeEmail, setShowChangeEmail] = useState(false)
   const [showChangePassword, setShowChangePassword] = useState(false)
   const [showEmailOtp, setShowEmailOtp] = useState(false)
-  const [showChangePhone, setShowChangePhone] = useState(false)
+  const [showChangeWhatsApp, setShowChangeWhatsApp] = useState(false)
 
   // ── Profile query ───────────────────────────────────────────────────────────
   const { data: profileData } = useQuery({
@@ -553,33 +539,26 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Phone — verified via Email OTP */}
+                {/* Satu nomor kontak: Nomor WhatsApp (nomor HP akun lama ikut tampil di
+                    sini sampai diganti). Bukan identitas login, jadi tanpa password. */}
                 <div className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-green-50 dark:bg-green-500/10 flex items-center justify-center">
-                      <Phone size={15} className="text-green-600 dark:text-green-400" />
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
+                      <MessageCircle size={15} className="text-emerald-600 dark:text-emerald-400" />
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground font-medium">{t('profilePhone')}</p>
+                      <p className="text-xs text-muted-foreground font-medium">{t('profileWhatsapp')}</p>
                       <p className="text-sm font-medium text-foreground">
-                        {profile?.phone_number ?? user?.phone_number ?? '—'}
+                        {profile ? (profile.whatsapp_number ? `+${profile.whatsapp_number}` : t('notSetYet')) : '—'}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {profile?.is_verified && (
-                      <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium bg-green-50 dark:bg-green-500/10 px-2 py-0.5 rounded-lg">
-                        <CheckCircle size={11} />
-                        {t('statusVerified')}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => setShowChangePhone(true)}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-400 font-semibold"
-                    >
-                      {t('actionEdit')}
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setShowChangeWhatsApp(true)}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-400 font-semibold"
+                  >
+                    {profile?.whatsapp_number ? t('actionEdit') : t('actionAdd')}
+                  </button>
                 </div>
               </div>
             </div>
@@ -651,8 +630,8 @@ export default function ProfilePage() {
           onVerified={() => queryClient.invalidateQueries({ queryKey: ['user-profile'] })}
         />
       )}
-      {showChangePhone && (
-        <ChangePhoneModal onClose={() => setShowChangePhone(false)} />
+            {showChangeWhatsApp && (
+        <ChangeWhatsAppModal current={profile?.whatsapp_number} onClose={() => setShowChangeWhatsApp(false)} />
       )}
       {showChangePassword && (
         <ChangePasswordModal onClose={() => setShowChangePassword(false)} />

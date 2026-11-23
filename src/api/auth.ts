@@ -25,13 +25,33 @@ export const resendAccountOtp = (identifier: string) =>
     otp_channel: 'email',
   })
 
+// Verifikasi email WAJIB sebelum mendaftar: kode dikirim ke email (dijaga
+// captcha karena tiap permintaan mengirim email), lalu ditukar dengan token
+// yang ikut dikirim bersama formulir pendaftaran.
+export const sendRegistrationEmailCode = (email: string, captchaToken: string) =>
+  publicApi.post<ApiResponse<{ resend_after: number; expires_in: number }>>(
+    '/auth/registration/email-code',
+    { email },
+    { headers: { 'X-Captcha-Token': captchaToken } },
+  )
+
+export const verifyRegistrationEmailCode = (email: string, code: string) =>
+  publicApi.post<ApiResponse<{ email_verification_token: string; expires_in: number }>>(
+    '/auth/registration/verify-email',
+    { email, code },
+  )
+
 // Hanya field yang benar-benar diwajibkan backend (`data/request/registrasi_req.go`).
-// Nomor HP dan data lokasi (kota/kecamatan/kelurahan) sengaja tidak diminta saat
-// mendaftar — keduanya opsional dan diatur belakangan dari Pengaturan Outlet,
-// sama seperti di aplikasi kasir.
+// Data lokasi (kota/kecamatan/kelurahan) sengaja tidak diminta saat mendaftar —
+// opsional dan diatur belakangan dari Pengaturan Outlet, sama seperti di
+// aplikasi kasir.
 export interface RegisterRequest {
   full_name: string
   email: string
+  /** Token dari verifyRegistrationEmailCode — wajib. */
+  email_verification_token: string
+  /** Nomor WhatsApp pemilik — wajib. */
+  phone_number: string
   password: string
   business_name: string
   business_type_id: number
@@ -62,6 +82,11 @@ export const changeEmail = (email: string, password: string) =>
 
 export const changePhone = (phone_number: string, password: string) =>
   api.put<ApiResponse<null>>('/user/change-phone', { phone_number, password })
+
+// Nomor WhatsApp pemilik: kontak untuk tim Loka, bukan identitas login — jadi
+// tanpa password. Server menjawab dengan bentuk tersimpannya (62…).
+export const updateWhatsApp = (whatsapp_number: string) =>
+  api.put<ApiResponse<{ whatsapp_number: string }>>('/user/whatsapp', { whatsapp_number })
 
 export const sendEmailVerification = () =>
   api.post<ApiResponse<null>>('/user/send-email-verification')

@@ -1,13 +1,13 @@
 import Form from '@/components/ui/Form'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Store, CheckCircle2 } from 'lucide-react'
+import { Eye, EyeOff, Store, CheckCircle2, Send } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile'
 import { useThemeStore } from '@/store/themeStore'
 import { CAPTCHA_ENABLED, initialCaptchaToken } from '@/lib/captcha'
-import { registerBusiness } from '@/api/auth'
+import { registerBusiness, sendRegistrationEmailCode, verifyRegistrationEmailCode } from '@/api/auth'
 import { applyPendingReferral, capturePendingReferral } from '@/lib/pendingReferral'
 import { useAuthStore } from '@/store/authStore'
 import { hydrateUserFromToken } from '@/lib/jwt'
@@ -23,13 +23,15 @@ import { t } from '@/lib/i18n'
 
 // Formnya dibuat sama persis dengan aplikasi kasir
 // (`lib/features/auth/views/widgets/register_contain_widget.dart`): hanya field
-// yang benar-benar diwajibkan backend. Nomor HP, konfirmasi password, dan empat
-// dropdown lokasi berantai sengaja tidak ada — semuanya opsional di server dan
-// diatur belakangan dari Pengaturan Outlet, sehingga pendaftaran tidak
-// bergantung pada rantai permintaan jaringan yang bisa gagal di tengah jalan.
+// yang benar-benar diwajibkan backend — termasuk verifikasi email lewat kode
+// SEBELUM mendaftar dan nomor WhatsApp pemilik. Konfirmasi password dan empat
+// dropdown lokasi berantai sengaja tidak ada — opsional di server dan diatur
+// belakangan dari Pengaturan Outlet, sehingga pendaftaran tidak bergantung
+// pada rantai permintaan jaringan yang bisa gagal di tengah jalan.
 interface FormData {
   full_name: string
   email: string
+  phone_number: string
   password: string
   business_name: string
   business_type_id: string
@@ -37,7 +39,7 @@ interface FormData {
 }
 
 const emptyForm: FormData = {
-  full_name: '', email: '', password: '',
+  full_name: '', email: '', phone_number: '', password: '',
   business_name: '', business_type_id: '', business_vertical_id: '',
 }
 
@@ -110,6 +112,80 @@ export default function RegisterPage() {
 
   const handleCaptchaSuccess = (token: string) => setCaptchaToken(token)
 
+  // Token Turnstile sekali pakai: setiap kali server memakainya (kirim kode,
+  // pendaftaran gagal), widget diulang agar menerbitkan token baru.
+  const resetCaptcha = () => {
+    setCaptchaToken(initialCaptchaToken())
+    turnstileRef.current?.reset()
+  }
+
+  // ── Verifikasi email (wajib sebelum mendaftar) ──────────────────────────────
+  // Mengubah email setelah kode terkirim/terverifikasi membatalkan langkah ini:
+  // token hanya berlaku untuk email yang sama.
+  const [codeSentTo, setCodeSentTo]       = useState<string | null>(null)
+  const [verified, setVerified]           = useState<{ email: string; token: string } | null>(null)
+  const [code, setCode]                   = useState('')
+  const [sendingCode, setSendingCode]     = useState(false)
+  const [verifyingCode, setVerifyingCode] = useState(false)
+  const [resendLeft, setResendLeft]       = useState(0)
+
+  const normalizedEmail = form.email.trim().toLowerCase()
+  const emailVerified = verified !== null && verified.email === normalizedEmail
+
+  useEffect(() => {
+    if (resendLeft <= 0) return
+    const id = window.setTimeout(() => setResendLeft((s) => Math.max(0, s - 1)), 1000)
+    return () => window.clearTimeout(id)
+  }, [resendLeft])
+
+  const resetEmailVerification = () => {
+    setCodeSentTo(null); setVerified(null); setCode(''); setResendLeft(0)
+  }
+
+  const handleEmailChange = (value: string) => {
+    setForm((prev) => ({ ...prev, email: value }))
+    const next = value.trim().toLowerCase()
+    if ((codeSentTo && codeSentTo !== next) || (verified && verified.email !== next)) resetEmailVerification()
+  }
+
+  const handleSendCode = async () => {
+    const email = normalizedEmail
+    if (!email)                                    { toast.error(t('regEmailRequiredMsg')); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast.error(t('regEmailInvalidMsg')); return }
+    if (!captchaToken)                             { toast.error(t('regCaptchaIncomplete')); return }
+    setSendingCode(true)
+    try {
+      const res = await sendRegistrationEmailCode(email, captchaToken)
+      setCodeSentTo(email)
+      setCode('')
+      setResendLeft(res.data?.data?.resend_after ?? 60)
+      toast.success(t('regEmailCodeSentToast'))
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+    } finally {
+      setSendingCode(false)
+      resetCaptcha()
+    }
+  }
+
+  const handleVerifyCode = async (value = code) => {
+    if (!codeSentTo || verifyingCode) return
+    if (!/^\d{6}$/.test(value)) { toast.error(t('regEmailCodeInvalidMsg')); return }
+    setVerifyingCode(true)
+    try {
+      const res = await verifyRegistrationEmailCode(codeSentTo, value)
+      const token = res.data?.data?.email_verification_token
+      if (!token) throw new Error('missing token')
+      setVerified({ email: codeSentTo, token })
+      setCodeSentTo(null); setCode(''); setResendLeft(0)
+      toast.success(t('regEmailVerified'))
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+    } finally {
+      setVerifyingCode(false)
+    }
+  }
+
   // ── Master data ─────────────────────────────────────────────────────────────
 
   const { data: businessTypesData } = useQuery({
@@ -156,13 +232,18 @@ export default function RegisterPage() {
     e?.preventDefault()
 
     const fullName = form.full_name.trim()
-    const email = form.email.trim()
+    const email = normalizedEmail
+    const phone = form.phone_number.trim()
+    const phoneDigits = phone.replace(/\D/g, '')
     const businessName = form.business_name.trim()
 
     // Urutan validasi mengikuti aplikasi supaya pesan gagalnya identik.
     if (!fullName)                                    { toast.error(t('regNameRequired')); return }
     if (!email)                                       { toast.error(t('regEmailRequiredMsg')); return }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))    { toast.error(t('regEmailInvalidMsg')); return }
+    if (!emailVerified || !verified)                  { toast.error(t('regEmailVerifyFirst')); return }
+    if (!phoneDigits)                                 { toast.error(t('regWhatsappRequired')); return }
+    if (phoneDigits.length < 9 || phoneDigits.length > 15) { toast.error(t('regWhatsappInvalid')); return }
     if (form.password.length < 6)                     { toast.error(t('pwMinLength')); return }
     if (!businessName)                                { toast.error(t('regBusinessNameRequired')); return }
     if (!form.business_type_id)                       { toast.error(t('regBusinessTypeRequiredMsg')); return }
@@ -174,6 +255,8 @@ export default function RegisterPage() {
       const res = await registerBusiness({
         full_name:            fullName,
         email:                email,
+        email_verification_token: verified.token,
+        phone_number:         phone,
         password:             form.password,
         business_name:        businessName,
         business_type_id:     Number(form.business_type_id),
@@ -201,11 +284,13 @@ export default function RegisterPage() {
       // Server lama: akun baru aktif setelah OTP dari emailnya dimasukkan.
       navigate('/verifikasi-email', { replace: true, state: { email, from: 'register', referralCode } })
     } catch (err) {
+      // Token verifikasi kedaluwarsa: buka lagi langkah kirim kode.
+      const errCode = (err as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
+      if (errCode === 'EMAIL_NOT_VERIFIED') resetEmailVerification()
       toast.error(getErrorMessage(err))
-      setCaptchaToken(initialCaptchaToken())
       // Token Turnstile sekali pakai: widget harus diulang agar menerbitkan
       // token baru, kalau tidak tombol Daftar terkunci setelah satu kali gagal.
-      turnstileRef.current?.reset()
+      resetCaptcha()
       setLoading(false)
     }
   }
@@ -305,13 +390,74 @@ export default function RegisterPage() {
                     onChange={(v) => setForm({ ...form, full_name: v })}
                     placeholder={t('regOwnerNamePlaceholder')}
                   />
+                  <div>
+                    <InputField
+                      label={t('labelEmail')}
+                      type="email"
+                      value={form.email}
+                      onChange={handleEmailChange}
+                      placeholder={t('profileBusinessEmailPlaceholder')}
+                      hint={emailVerified || codeSentTo ? undefined : t('regEmailHint')}
+                      suffix={emailVerified ? <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" aria-label={t('regEmailVerified')} /> : undefined}
+                    />
+                    {emailVerified ? (
+                      <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-1">{t('regEmailVerified')}</p>
+                    ) : codeSentTo ? (
+                      <div className="mt-2 space-y-2">
+                        <p className="text-xs text-muted-foreground">{t('regEmailCodeSent', { email: codeSentTo })}</p>
+                        <div className="flex gap-2">
+                          <input
+                            value={code}
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            maxLength={6}
+                            aria-label={t('regEmailCodeHint')}
+                            placeholder={t('regEmailCodeHint')}
+                            onChange={(e) => {
+                              const v = e.target.value.replace(/\D/g, '').slice(0, 6)
+                              setCode(v)
+                              if (v.length === 6) void handleVerifyCode(v)
+                            }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void handleVerifyCode() } }}
+                            className="min-w-0 flex-1 px-4 py-2.5 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm tracking-[0.3em]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleVerifyCode()}
+                            disabled={verifyingCode}
+                            className="shrink-0 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                          >
+                            {t('regEmailVerifyCode')}
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleSendCode()}
+                          disabled={resendLeft > 0 || sendingCode}
+                          className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-60 disabled:no-underline"
+                        >
+                          {resendLeft > 0 ? t('regEmailResendIn', { seconds: resendLeft }) : t('regEmailResend')}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void handleSendCode()}
+                        disabled={sendingCode}
+                        className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl border border-blue-600/40 bg-blue-600/10 py-2.5 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-600/15 disabled:opacity-60"
+                      >
+                        <Send size={14} /> {sendingCode ? t('regEmailSendingCode') : t('regEmailSendCode')}
+                      </button>
+                    )}
+                  </div>
+
                   <InputField
-                    label={t('labelEmail')}
-                    type="email"
-                    value={form.email}
-                    onChange={(v) => setForm({ ...form, email: v })}
-                    placeholder={t('profileBusinessEmailPlaceholder')}
-                    hint={t('regEmailHint')}
+                    label={t('regWhatsapp')}
+                    type="tel"
+                    value={form.phone_number}
+                    onChange={(v) => setForm({ ...form, phone_number: v.replace(/[^0-9+\-\s]/g, '') })}
+                    placeholder={t('regWhatsappPlaceholder')}
+                    hint={t('regWhatsappHint')}
                   />
 
                   {/* Satu field password dengan tombol lihat/sembunyikan —

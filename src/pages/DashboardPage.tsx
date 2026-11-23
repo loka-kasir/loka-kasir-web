@@ -3,6 +3,7 @@ import Header from '@/components/layout/Header'
 import DashboardStatCards from '@/components/dashboard/DashboardStatCards'
 import DashboardSalesOverview from '@/components/dashboard/DashboardSalesOverview'
 import SetupChecklistCard from '@/components/dashboard/SetupChecklistCard'
+import WhatsAppReminderCard from '@/components/dashboard/WhatsAppReminderCard'
 import InstallAppCard from '@/components/dashboard/InstallAppCard'
 import RecentTransactionsList from '@/components/dashboard/RecentTransactionsList'
 import TopProductsChart from '@/components/dashboard/TopProductsChart'
@@ -59,6 +60,7 @@ export default function DashboardPage() {
       <Header title={business?.business_name || t('navHome')} subtitle={`${today} · ${subtitle}`} />
       <div className="page-content flex-1 min-h-0 min-w-0 overflow-y-auto p-4 md:p-6 space-y-5">
         <QueryErrorState error={homeError} onRetry={reloadHome} />
+        <WhatsAppReminderCard />
         <SetupChecklistCard />
         {showSalesOverview
           ? <DashboardSalesOverview outletId={outletId} />
