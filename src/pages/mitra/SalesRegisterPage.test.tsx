@@ -27,7 +27,7 @@ async function fill(id: string, value: string) {
   })
 }
 it('sends new partners directly to the kit after saving their separate sales session', async () => {
-  vi.mocked(getSalesRecruitment).mockResolvedValue({ data: { status: true, data: { limit: 100, reserved: 1, remaining: 99, registration_open: true, terms_version: '2026-10-26' } } } as Awaited<ReturnType<typeof getSalesRecruitment>>)
+  vi.mocked(getSalesRecruitment).mockResolvedValue({ data: { status: true, data: { limit: 100, reserved: 1, remaining: 99, registration_open: true, terms_version: '2026-11-23' } } } as Awaited<ReturnType<typeof getSalesRecruitment>>)
   vi.mocked(registerSales).mockResolvedValue({ data: { status: true, data: { status: 'pending' } } } as Awaited<ReturnType<typeof registerSales>>)
   vi.mocked(loginSales).mockResolvedValue({ data: { data: { token: 'new-sales-session' } } } as Awaited<ReturnType<typeof loginSales>>)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -36,7 +36,7 @@ it('sends new partners directly to the kit after saving their separate sales ses
   await fill('sales-name', 'Calon Mitra'); await fill('sales-signup-email', 'partner@example.test'); await fill('sales-phone', '081234567890'); await fill('sales-signup-password', 'safe-password-123'); await fill('sales-signup-confirmation', 'safe-password-123')
   await act(async () => { host.querySelector<HTMLInputElement>('#sales-accept-terms')!.click() })
   await act(async () => { host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await settle() })
-  expect(registerSales).toHaveBeenCalledWith(expect.objectContaining({ accept_terms: true, terms_version: '2026-10-26', email: 'partner@example.test' }), 'dev-no-captcha')
+  expect(registerSales).toHaveBeenCalledWith(expect.objectContaining({ accept_terms: true, terms_version: '2026-11-23', email: 'partner@example.test' }), 'dev-no-captcha')
   expect(session.token).toBe('new-sales-session')
   expect(host.textContent).toContain('Materials ready')
   expect(host.textContent).not.toContain('Unexpected home redirect')

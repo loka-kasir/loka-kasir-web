@@ -1,10 +1,10 @@
 /**
- * Syarat & ketentuan program referral sales, versi 2026-10-26 — sama dengan
+ * Syarat & ketentuan program referral sales, versi 2026-11-23 — sama dengan
  * repository.SalesTermsVersion di backend. Mengubah isinya berarti menaikkan
  * versi di sana agar setiap sales menyetujui ulang.
  */
 const terms = [
-  ['Kode sales', 'Pelanggan baru yang memakai kode Anda sebelum membuat tagihan pertama mendapat diskon 20% untuk pembayaran Pro bulanan atau tahunan pertamanya. Kode tidak berlaku untuk pelanggan yang pernah berlangganan Pro, dan satu usaha hanya bisa memakai satu kode.'],
+  ['Kode sales', 'Pelanggan baru yang memakai kode Anda sebelum membuat tagihan pertama mendapat potongan Rp10.000 untuk pembayaran Pro bulanan pertama atau diskon 10% untuk pembayaran Pro tahunan pertama. Kode tidak berlaku untuk pelanggan yang pernah berlangganan Pro, dan satu usaha hanya bisa memakai satu kode.'],
   ['Besaran komisi', 'Anda mendapat 50% dari nilai bersih setiap pembayaran Pro bulanan atau tahunan pelanggan Anda selama 12 bulan sejak pembayaran langganan pertamanya, lalu 20% selama pelanggan tersebut terus membayar. Paket tiga tahun dan tambahan outlet tidak menghasilkan komisi.'],
   ['Nilai bersih', 'Nilai bersih adalah nominal yang dibayar pelanggan setelah dikurangi biaya pembayaran (payment gateway) dan pajak yang berlaku. Komisi dibulatkan ke bawah ke rupiah penuh.'],
   ['Masa tahan & pencairan', 'Komisi dapat dicairkan 30 hari setelah pembayaran pelanggan. Pencairan dilakukan setiap bulan sekitar tanggal 10 ke rekening atas nama Anda, dengan minimal Rp100.000; saldo di bawah minimal terbawa ke bulan berikutnya.'],

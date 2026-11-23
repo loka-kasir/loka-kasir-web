@@ -7,8 +7,10 @@ export interface ReferralSummary {
   applied_code: string
   /** Program kode yang diterapkan; server lama tidak mengirimnya. */
   applied_program?: 'customer' | 'sales' | ''
-  /** Persen diskon tagihan pertama untuk kode sales (0 = nominal tetap). */
+  /** Persen diskon tagihan Pro tahunan pertama untuk kode sales (0 = nominal tetap). */
   discount_percent?: number
+  /** Potongan tetap (IDR) tagihan Pro bulanan pertama untuk kode sales. */
+  monthly_discount_amount?: number
   can_apply: boolean
   balance: number
   reserved: number

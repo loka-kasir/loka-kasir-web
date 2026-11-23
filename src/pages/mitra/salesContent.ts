@@ -1,7 +1,7 @@
 import type { SalesContent, SalesContentMedia } from '@/api/sales'
 import { salesContentAssets } from '@/data/salesContentAssets'
 
-export const SALES_TERMS_VERSION = '2026-10-26'
+export const SALES_TERMS_VERSION = '2026-11-23'
 
 export interface SalesShareContext { active: boolean; code: string; link: string }
 

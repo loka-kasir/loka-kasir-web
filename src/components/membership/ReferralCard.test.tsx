@@ -40,12 +40,17 @@ describe('referral checkout', () => {
     expect(text).toContain('Rp50.000')
     expect(host.querySelector('form')).toBeNull()
   })
-  it('previews the sales code discount as a percentage of the invoice', async () => {
-    await mount({ ...summary, applied_code: 'ODHI20', applied_program: 'sales', discount_percent: 20, can_apply: false }, 'pro', 59000)
-    const text = host.textContent!.replace(/\s/g, '')
-    expect(text).toContain('Rp11.800')
-    expect(text).toContain('Rp47.200')
+  it('previews the sales code discount as fixed monthly and percentage yearly', async () => {
+    await mount({ ...summary, applied_code: 'ODHI20', applied_program: 'sales', monthly_discount_amount: 10000, discount_percent: 10, can_apply: false }, 'pro', 59000)
+    const monthlyText = host.textContent!.replace(/\s/g, '')
+    expect(monthlyText).toContain('Rp10.000')
+    expect(monthlyText).toContain('Rp49.000')
     expect(host.textContent).toContain('Kode sales')
+    act(() => root.unmount())
+    await mount({ ...summary, applied_code: 'ODHI20', applied_program: 'sales', monthly_discount_amount: 10000, discount_percent: 10, can_apply: false }, 'pro-yearly', 590000)
+    const yearlyText = host.textContent!.replace(/\s/g, '')
+    expect(yearlyText).toContain('Rp59.000')
+    expect(yearlyText).toContain('Rp531.000')
   })
   it('caps wallet redemption at half the monthly invoice', async () => {
     await mount({ ...summary, balance: 59000, first_purchase: false })

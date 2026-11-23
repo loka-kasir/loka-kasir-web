@@ -28,7 +28,9 @@ export default function SalesHomePage() {
     try { await navigator.clipboard.writeText(text); toast.success(`${label} disalin`) } catch { toast.error(`${label} tidak dapat disalin`) }
   }
   const s = summary.data
-  const message = `Pakai Loka Kasir untuk usahamu dan dapatkan diskon ${s?.discount_percent ?? 20}% untuk pembayaran pertama. Daftar lewat link ini atau masukkan kode ${profile.code}: ${link}`
+  const monthlyDiscount = s?.monthly_discount_amount ?? 10000
+  const yearlyPercent = s?.discount_percent ?? 10
+  const message = `Pakai Loka Kasir untuk usahamu dan dapatkan potongan ${rupiah(monthlyDiscount)} (bulanan) atau diskon ${yearlyPercent}% (tahunan) untuk pembayaran pertama. Daftar lewat link ini atau masukkan kode ${profile.code}: ${link}`
 
   return (
     <>
@@ -81,7 +83,7 @@ export default function SalesHomePage() {
       {s && <section className="rounded-2xl border border-border bg-card p-5 text-sm">
         <h2 className="font-semibold">Cara komisi dihitung</h2>
         <ul className="mt-3 space-y-2 text-muted-foreground">
-          <li>Pelanggan dengan kode Anda mendapat diskon <strong className="text-foreground">{s.discount_percent}%</strong> untuk pembayaran Pro bulanan atau tahunan pertama.</li>
+          <li>Pelanggan dengan kode Anda mendapat potongan <strong className="text-foreground">{rupiah(monthlyDiscount)}</strong> untuk Pro bulanan pertama atau diskon <strong className="text-foreground">{yearlyPercent}%</strong> untuk Pro tahunan pertama.</li>
           <li>Anda mendapat <strong className="text-foreground">{s.first_year_rate_percent}%</strong> dari nilai bersih setiap pembayaran selama 12 bulan sejak pembayaran pertama pelanggan, lalu <strong className="text-foreground">{s.later_rate_percent}%</strong> selama pelanggan terus berlangganan.</li>
           <li>Nilai bersih = yang dibayar pelanggan dikurangi biaya pembayaran. Komisi bisa dicairkan {s.hold_days} hari setelah pembayaran, setiap bulan sekitar tanggal 10, minimal {rupiah(s.payout_minimum)}.</li>
           <li>Paket tiga tahun dan tambahan outlet tidak menghasilkan komisi.</li>

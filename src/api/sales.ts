@@ -66,6 +66,7 @@ export interface SalesRecruitment {
   first_year_rate_percent: number
   later_rate_percent: number
   discount_percent: number
+  monthly_discount_amount?: number
   payout_minimum: number
   hold_days: number
 }
@@ -112,6 +113,7 @@ export interface SalesSummary {
   payout_minimum: number
   hold_days: number
   discount_percent: number
+  monthly_discount_amount?: number
   first_year_rate_percent: number
   later_rate_percent: number
 }
