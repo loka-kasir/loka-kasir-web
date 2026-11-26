@@ -1082,6 +1082,8 @@ export interface OutletConfig {
    *  hanya mengetik uang yang benar-benar ada di laci. Selisih tetap tercatat
    *  dan baru tampil di laporan setelah shift tertutup. Hanya berlaku peran KASIR. */
   blind_cash_close?: boolean
+  /** Omzet disembunyikan dari karyawan selain Pemilik, Manajer, dan Admin. */
+  hide_revenue_from_staff?: boolean
   // QRIS milik merchant (statis: QR/link milik merchant sendiri).
   qris_enabled: boolean
   qris_mode: 'static'

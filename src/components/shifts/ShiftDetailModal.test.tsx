@@ -25,7 +25,7 @@ beforeEach(() => {
   root = createRoot(host)
 })
 afterEach(() => { act(() => root.unmount()); qc.clear() })
-function render(overrides: Partial<Shift> = {}) {
+function render(overrides: Partial<Shift> = {}, revenueHidden = false) {
   const shift = {
     status: 'closed', opened_at: '2026-10-02T01:00:00Z', closed_at: '2026-10-02T09:00:00Z',
     cashier: { name: 'Rina' }, terminal: { name: 'Kasir 1' }, outlet: { name: 'Cabang A' },
@@ -34,7 +34,7 @@ function render(overrides: Partial<Shift> = {}) {
     total_refunds: 0, total_cash_in: 0, total_cash_out: 0, notes: 'Laci kosong',
     ...overrides,
   } as Shift
-  act(() => root.render(<QueryClientProvider client={qc}><ShiftDetailModal shift={shift} onClose={() => {}} /></QueryClientProvider>))
+  act(() => root.render(<QueryClientProvider client={qc}><ShiftDetailModal shift={shift} onClose={() => {}} revenueHidden={revenueHidden} /></QueryClientProvider>))
 }
 it('shows counted zero cash, the real shortage, payment breakdown, and notes', () => {
   render()
@@ -114,4 +114,12 @@ it('voids a manual flow with a reason and refreshes shift totals', async () => {
   expect(voidShiftCashFlow).toHaveBeenCalledWith('shift-1', 'f1', 'Tercatat dua kali')
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['shifts-financial'] })
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ['shift-detail'] })
+})
+it('hides sales, expected cash, and the difference when revenue is hidden', () => {
+  render({ total_sales: undefined, cash_amount: undefined, qris_amount: undefined, expected_cash: undefined, discrepancy: undefined, closing_cash: 41000 }, true)
+  expect(host.textContent).not.toContain(t('shiftTotalSales'))
+  expect(host.textContent).not.toContain(t('shiftExpectedCash'))
+  expect(host.textContent).not.toContain(t('shiftCashDiff'))
+  expect(host.textContent).not.toContain('Penjualan lunas tunai')
+  expect(host.textContent).toContain(t('shiftActualCash'))
 })

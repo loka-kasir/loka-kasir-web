@@ -71,6 +71,7 @@ export const upsertOutletConfig = (outletId: string, data: {
   qris_dynamic_enabled?: boolean
   payment_link?: string | null
   blind_cash_close?: boolean
+  hide_revenue_from_staff?: boolean
   show_qris_on_receipt?: boolean
   qris_auto_confirm_enabled?: boolean
   qris_unique_amount_enabled?: boolean

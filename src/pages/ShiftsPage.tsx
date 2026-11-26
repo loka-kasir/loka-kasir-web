@@ -18,6 +18,7 @@ import { useAuthStore } from '@/store/authStore'
 import type { Shift, ShiftSchedule } from '@/types'
 import { formatCurrency, formatDateTime, getErrorMessage } from '@/lib/utils'
 import { exportToCSV, csvFilename } from '@/lib/exportUtils'
+import { isRevenueHidden } from '@/lib/revenueHidden'
 import { t } from '@/lib/i18n'
 
 function pad(n: number) { return String(n).padStart(2, '0') }
@@ -76,6 +77,9 @@ export default function ShiftsPage({ embedded = false }: { embedded?: boolean } 
   })
 
   const shifts: Shift[] = shiftsData?.data?.data?.results ?? []
+  // Omzet disembunyikan pemilik untuk karyawan ini: kolom penjualan dan kas
+  // seharusnya tidak ditampilkan (server sudah mengosongkannya).
+  const revenueHidden = isRevenueHidden(shiftsData) || isRevenueHidden(detailData)
   const shiftsPagination = shiftsData?.data?.data
   const schedules: ShiftSchedule[] = schedulesData?.data?.data ?? []
 
@@ -127,12 +131,14 @@ export default function ShiftsPage({ embedded = false }: { embedded?: boolean } 
       [t('labelOutlet')]: s.outlet?.name ?? '-',
       [t('shiftOpenedAt')]: formatDateTime(s.opened_at),
       [t('shiftClosedAt')]: s.closed_at ? formatDateTime(s.closed_at) : '-',
-      [t('shiftTotalSales')]: s.total_sales ?? 0,
-      [t('shiftStaffSales')]: s.staff_sales ?? s.total_sales ?? 0,
+      ...(revenueHidden ? {} : {
+        [t('shiftTotalSales')]: s.total_sales ?? 0,
+        [t('shiftStaffSales')]: s.staff_sales ?? s.total_sales ?? 0,
+      }),
       [t('shiftOpeningCash')]: s.opening_cash,
-      [t('shiftExpectedCash')]: s.expected_cash ?? '',
+      ...(revenueHidden ? {} : { [t('shiftExpectedCash')]: s.expected_cash ?? '' }),
       [t('shiftActualCash')]: s.closing_cash ?? '',
-      [t('shiftCashDiff')]: s.discrepancy ?? '',
+      ...(revenueHidden ? {} : { [t('shiftCashDiff')]: s.discrepancy ?? '' }),
       [t('labelNote')]: s.notes ?? '',
       'Status': s.status === 'open' ? t('shiftOpen') : t('shiftClosed'),
     }))
@@ -165,11 +171,13 @@ export default function ShiftsPage({ embedded = false }: { embedded?: boolean } 
       label: t('finClosedAt'),
       render: (row: Shift) => <span className="text-sm text-muted-foreground">{row.closed_at ? formatDateTime(row.closed_at) : '-'}</span>,
     },
-    {
-      key: 'total_sales',
-      label: t('shiftTotalSales'),
-      render: (row: Shift) => <span className="font-semibold text-foreground">{formatCurrency(row.total_sales ?? 0)}</span>,
-    },
+    ...(revenueHidden ? [] : [
+      {
+        key: 'total_sales',
+        label: t('shiftTotalSales'),
+        render: (row: Shift) => <span className="font-semibold text-foreground">{formatCurrency(row.total_sales ?? 0)}</span>,
+      },
+    ]),
     {
       key: 'status',
       label: t('labelStatus'),
@@ -361,6 +369,7 @@ export default function ShiftsPage({ embedded = false }: { embedded?: boolean } 
       {detailShift && (
         <ShiftDetailModal
           shift={loadedShift ?? detailShift}
+          revenueHidden={revenueHidden}
           onClose={() => setDetailShift(null)}
           notice={detailError ? t('shiftDetailLoadFailed') : detailFetching ? t('shiftDetailLoading') : undefined}
           onCorrectCash={canForceClose && !detailFetching && !detailError && loadedShift?.status === 'closed' && loadedShift.closing_cash != null ? () => {

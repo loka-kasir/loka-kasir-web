@@ -11,6 +11,8 @@ interface ShiftDetailModalProps {
   onClose: () => void
   onCorrectCash?: () => void
   notice?: string
+  /** Omzet disembunyikan untuk karyawan ini — lihat lib/revenueHidden. */
+  revenueHidden?: boolean
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -22,7 +24,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-export default function ShiftDetailModal({ shift, onClose, onCorrectCash, notice }: ShiftDetailModalProps) {
+export default function ShiftDetailModal({ shift, onClose, onCorrectCash, notice, revenueHidden = false }: ShiftDetailModalProps) {
   const isClosed = shift.status === 'closed'
   // Older force-close responses expose this audit marker in notes rather than
   // a separate flag. A zero difference from these closures is not a cash count.
@@ -71,20 +73,20 @@ export default function ShiftDetailModal({ shift, onClose, onCorrectCash, notice
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t('shiftCashRecap')}</p>
           <div className="bg-muted rounded-xl px-4 py-1">
             <InfoRow label={t('shiftOpeningCash')} value={amount(shift.opening_cash)} />
-            <InfoRow label={t('shiftTotalSales')} value={amount(shift.total_sales)} />
-            {shift.staff_sales != null && shift.staff_sales !== shift.total_sales && (
+            {!revenueHidden && <InfoRow label={t('shiftTotalSales')} value={amount(shift.total_sales)} />}
+            {!revenueHidden && shift.staff_sales != null && shift.staff_sales !== shift.total_sales && (
               <InfoRow label={t('shiftStaffSales')} value={amount(shift.staff_sales)} />
             )}
-            {shift.cash_amount != null && <InfoRow label={t('shiftPaidCash')} value={amount(shift.cash_amount)} />}
-            {shift.qris_amount != null && <InfoRow label={t('shiftPaidQris')} value={amount(shift.qris_amount)} />}
+            {!revenueHidden && shift.cash_amount != null && <InfoRow label={t('shiftPaidCash')} value={amount(shift.cash_amount)} />}
+            {!revenueHidden && shift.qris_amount != null && <InfoRow label={t('shiftPaidQris')} value={amount(shift.qris_amount)} />}
             {shift.total_kasbon != null && <InfoRow label={t('shiftUnpaidDebt')} value={amount(shift.total_kasbon)} />}
             <InfoRow label={t('shiftRefunded')} value={amount(shift.total_refunds)} />
             <InfoRow label={t('shiftCashIn')} value={amount(shift.total_cash_in)} />
             {shift.total_settlement != null && <InfoRow label={t('shiftDebtSettlement')} value={amount(shift.total_settlement)} />}
             <InfoRow label={t('shiftCashOut')} value={amount(shift.total_cash_out)} />
-            <InfoRow label={t('shiftExpectedCash')} value={amount(shift.expected_cash)} />
+            {!revenueHidden && <InfoRow label={t('shiftExpectedCash')} value={amount(shift.expected_cash)} />}
             <InfoRow label={t('shiftActualCash')} value={uncounted ? t('shiftCashNotCounted') : amount(shift.closing_cash)} />
-            <InfoRow label={t('shiftCashDiff')} value={discrepancyDisplay} />
+            {!revenueHidden && <InfoRow label={t('shiftCashDiff')} value={discrepancyDisplay} />}
           </div>
         </div>
       )}

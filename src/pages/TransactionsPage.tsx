@@ -22,6 +22,7 @@ import type { SoldProduct, Transaction } from '@/types'
 import { formatCurrency, formatDateTime, transactionProfit } from '@/lib/utils'
 import { formatStockQuantity, formatQuantity } from '@/lib/money'
 import { t } from '@/lib/i18n'
+import { isRevenueHidden } from '@/lib/revenueHidden'
 
 function statusBadge(tx: Transaction) {
   if (tx.is_canceled) return <Badge variant="red">{t('statusCancelled')}</Badge>
@@ -165,6 +166,9 @@ export default function TransactionsPage() {
   const soldProducts = soldData?.data?.data ?? []
   const soldTotalUnits = soldProducts.reduce((s, p) => s + (p.units_sold ?? 0), 0)
   const soldTotalRevenue = soldProducts.reduce((s, p) => s + (p.revenue ?? 0), 0)
+  // Omzet disembunyikan pemilik untuk karyawan ini: kolom dan total omzet
+  // tidak ditampilkan (server sudah mengosongkannya).
+  const soldRevenueHidden = isRevenueHidden(soldData)
 
   const productColumns = [
     {
@@ -187,12 +191,12 @@ export default function TransactionsPage() {
         </span>
       ),
     },
-    {
+    ...(soldRevenueHidden ? [] : [{
       key: 'revenue',
       label: t('txTotalAmount'),
       className: 'text-right',
       render: (row: SoldProduct) => <span className="text-sm font-semibold text-foreground">{formatCurrency(row.revenue)}</span>,
-    },
+    }]),
   ]
 
   const columns = [
@@ -381,9 +385,11 @@ export default function TransactionsPage() {
                     <span className="text-muted-foreground">
                       {t('txTotalQty')} <span className="font-semibold text-foreground">{formatQuantity(soldTotalUnits)}</span>
                     </span>
-                    <span className="text-muted-foreground">
-                      {t('txTotalAmountColon')} <span className="font-semibold text-foreground">{formatCurrency(soldTotalRevenue)}</span>
-                    </span>
+                    {!soldRevenueHidden && (
+                      <span className="text-muted-foreground">
+                        {t('txTotalAmountColon')} <span className="font-semibold text-foreground">{formatCurrency(soldTotalRevenue)}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               )}

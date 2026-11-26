@@ -60,6 +60,7 @@ type FormState = {
   rounding_denomination: number
   allow_partial_payment: boolean
   blind_cash_close: boolean
+  hide_revenue_from_staff: boolean
   qris_enabled: boolean
   qris_mode: 'static'
   qris_payload: string
@@ -87,6 +88,7 @@ const emptyForm: FormState = {
   rounding_enabled: false, rounding_denomination: 100,
   allow_partial_payment: false,
   blind_cash_close: false,
+  hide_revenue_from_staff: false,
   // QRIS tidak dinyalakan otomatis. Mode dinamis lewat akun Duitku Loka Kasir
   // baru boleh setelah akun perusahaan disetujui Duitku, jadi outlet baru
   // dimulai dari mode statis dan pemiliknya yang menyalakan.
@@ -157,6 +159,7 @@ export default function OutletFormModal({ outlet, businessId, open, onClose, onS
           rounding_enabled: c.rounding_enabled, rounding_denomination: c.rounding_denomination || 100,
           allow_partial_payment: c.allow_partial_payment ?? false,
           blind_cash_close: c.blind_cash_close ?? false,
+          hide_revenue_from_staff: c.hide_revenue_from_staff ?? false,
           qris_enabled: c.qris_enabled ?? false, qris_mode: 'static',
           qris_payload: c.qris_payload ?? '',
           qris_dynamic_enabled: c.qris_dynamic_enabled ?? false,
@@ -213,6 +216,7 @@ export default function OutletFormModal({ outlet, businessId, open, onClose, onS
     rounding_denomination: form.rounding_denomination,
     allow_partial_payment: form.allow_partial_payment,
     blind_cash_close: form.blind_cash_close,
+    hide_revenue_from_staff: form.hide_revenue_from_staff,
     qris_enabled: form.qris_enabled,
     qris_mode: form.qris_mode,
     qris_payload: form.qris_payload || null,
@@ -413,6 +417,9 @@ export default function OutletFormModal({ outlet, businessId, open, onClose, onS
             // Tutup kasir "buta": kasir tidak melihat kas yang diharapkan
             // saat menutup shift, jadi tidak bisa menyamakan hitungannya.
             { key: 'blind_cash_close', label: t('bpBlindCashClose'), desc: t('bpBlindCashCloseDesc') },
+            // Omzet disembunyikan dari karyawan: server mengosongkan angkanya
+            // di Beranda, Riwayat, Produk Terjual, dan Shift.
+            { key: 'hide_revenue_from_staff', label: t('bpHideRevenue'), desc: t('bpHideRevenueDesc') },
             { key: 'require_order_confirmation', label: t('featOrderConfirm'), desc: t('featOrderConfirmDesc') },
           ] as const).map(({ key, label, desc }) => (
             <SwitchRow

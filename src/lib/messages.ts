@@ -2987,6 +2987,8 @@ const id = {
   // ── Pengaturan outlet: tutup kasir buta & QRIS ─────────────────────────────
   bpBlindCashClose: "Tutup kasir tanpa melihat nominal",
   bpBlindCashCloseDesc: "Kasir hanya mengisi uang di laci, tanpa melihat kas yang seharusnya dan selisihnya. Selisih tetap tercatat dan baru tampil di laporan setelah kasir ditutup.",
+  bpHideRevenue: "Sembunyikan omzet dari karyawan",
+  bpHideRevenueDesc: "Omzet, penjualan shift, dan uang kas seharusnya tidak ditampilkan untuk kasir dan karyawan lain — di aplikasi maupun di web. Pemilik, manajer, dan admin tetap melihatnya.",
   qrisCfgShowOnReceipt: "Tampilkan QRIS di Struk",
   qrisCfgShowOnReceiptDesc: "Tercetak di struk tagihan yang belum lunas, supaya pembeli bisa membayar lewat QRIS. Struk yang sudah lunas tidak memuatnya.",
   qrisCfgAutoConfirm: "Konfirmasi Otomatis",
@@ -7427,6 +7429,8 @@ const en: Catalog = {
   // ── Outlet settings: blind cash close & QRIS ───────────────────────────────
   bpBlindCashClose: "Close register without showing amounts",
   bpBlindCashCloseDesc: "Cashiers only enter the cash in the drawer, without seeing the expected cash or the difference. The difference is still recorded and shown in the report after the register is closed.",
+  bpHideRevenue: "Hide revenue from employees",
+  bpHideRevenueDesc: "Revenue, shift sales, and expected cash are hidden from cashiers and other employees — in the app and on the web. Owners, managers, and admins still see them.",
   qrisCfgShowOnReceipt: "Show QRIS on Receipt",
   qrisCfgShowOnReceiptDesc: "Printed on unpaid bill receipts so customers can pay with QRIS. Paid receipts never include it.",
   qrisCfgAutoConfirm: "Automatic Confirmation",
