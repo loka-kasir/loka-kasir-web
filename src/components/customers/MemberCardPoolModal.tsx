@@ -36,6 +36,8 @@ const ACCENTS: Record<AccentKey, { hex: string; soft: string; labelKey: MessageK
 }
 
 const POWERED_BY = 'powered by lokakasir.id'
+// Logo kecil Loka Kasir di samping watermark (sama dengan PDF aplikasi).
+const POWERED_BY_LOGO = '/icon-current.svg'
 
 function defaultTagline(purpose: Purpose): string {
   return purpose === 'gym' ? t('mcpTaglineGym') : t('mcpTaglineGeneral')
@@ -151,7 +153,7 @@ async function openPrintableCardSheet(opts: {
           <div class="card-body">${bodyHtml}</div>
           <div class="card-foot">
             <span class="store-info">${escapeHtml(storeInfo)}</span>
-            <span class="powered">${POWERED_BY}</span>
+            <span class="powered"><img class="powered-logo" src="${window.location.origin}${POWERED_BY_LOGO}" alt="" />${POWERED_BY}</span>
           </div>
         </div>`
     }),
@@ -205,7 +207,8 @@ async function openPrintableCardSheet(opts: {
     .tagline.left { text-align: left; }
     .card-foot { padding: 0 3.2mm 1.6mm; display: flex; align-items: center; justify-content: space-between; gap: 2mm; font-size: 5.4pt; color: ${isDark ? '#64748b' : '#94a3b8'}; }
     .store-info { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .powered { font-style: italic; flex-shrink: 0; }
+    .powered { font-style: italic; flex-shrink: 0; display: inline-flex; align-items: center; gap: 2px; }
+    .powered-logo { width: 2mm; height: 2mm; }
   </style>
 </head>
 <body>
@@ -521,7 +524,10 @@ export default function MemberCardPoolModal({
                       style={{ color: isDark ? '#64748B' : '#94A3B8' }}
                     >
                       <span className="truncate">{storeInfo}</span>
-                      <span className="italic shrink-0">{POWERED_BY}</span>
+                      <span className="italic shrink-0 inline-flex items-center gap-[3px]">
+                        <img src={POWERED_BY_LOGO} alt="" className="w-[9px] h-[9px]" />
+                        {POWERED_BY}
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -15,6 +15,9 @@ menamai perubahan yang sudah ter-deploy bersama aplikasi 1.58.0 – 1.60.1.
   slot; Kartu Member siap cetak (A4).
 
 **Perbaikan hasil audit 1.12.0**
+- **Kartu member cetak** (`MemberCardPoolModal.tsx`): watermark "powered by
+  lokakasir.id" di pratinjau dan lembar cetak kini diawali logo kecil Loka Kasir
+  (`/icon-current.svg`), sama dengan PDF aplikasi.
 - **Kartu Member**: daftar memuat semua halaman API (dulu berhenti di 200
   kartu — batch kedua tidak bisa diaktifkan maupun dicetak); lembar cetak hanya
   berisi kartu *tersedia* (dulu ikut mencetak kartu yang sudah dipakai
