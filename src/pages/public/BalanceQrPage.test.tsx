@@ -134,3 +134,12 @@ it('shows the lockout message after too many wrong codes', async () => {
   await act(async () => { memberButton().click(); await tick() })
   expect(host.textContent).toContain(t('pbTooMany'))
 })
+
+it('hides the member card button for stores without gym members', async () => {
+  vi.mocked(getBalanceCheckStore).mockResolvedValue(
+    { data: { data: { business_name: 'akira cafe', has_members: false } } } as Awaited<ReturnType<typeof getBalanceCheckStore>>)
+  await act(async () => { await client.invalidateQueries(); await tick() })
+  expect(memberButton()).toBeUndefined()
+  // Cek saldo tetap tersedia.
+  expect(host.textContent).toContain(t('bqSubmit'))
+})

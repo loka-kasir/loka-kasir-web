@@ -133,11 +133,14 @@ export default function BalanceQrPage() {
             className="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-bold disabled:opacity-50">
             {check.isPending ? t('bqChecking') : t('bqSubmit')}
           </button>
-          <button type="button" onClick={openMember} disabled={!canSubmit}
-            className="w-full py-2.5 rounded-xl bg-white ring-1 ring-blue-200 text-blue-700 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
-            <Loka.MemberCard size={16} accentOpacity={0} />
-            {member.isPending ? t('memOpening') : t('memOpenCard')}
-          </button>
+          {/* Server lama tidak mengirim has_members → tetap tampil. */}
+          {store.data.has_members !== false && (
+            <button type="button" onClick={openMember} disabled={!canSubmit}
+              className="w-full py-2.5 rounded-xl bg-white ring-1 ring-blue-200 text-blue-700 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
+              <Loka.MemberCard size={16} accentOpacity={0} />
+              {member.isPending ? t('memOpening') : t('memOpenCard')}
+            </button>
+          )}
         </div>
         <p className="text-xs text-gray-500 text-center">{t('bqForgot')}</p>
       </form>

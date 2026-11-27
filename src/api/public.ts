@@ -523,7 +523,7 @@ export const getPublicBalance = (token: string) =>
 
 /** QR cek saldo toko: nama toko sebelum pelanggan memasukkan datanya. */
 export const getBalanceCheckStore = (token: string) =>
-  publicApi.get<ApiResponse<{ business_name: string }>>(`/public/cek-saldo/${encodeURIComponent(token)}`)
+  publicApi.get<ApiResponse<{ business_name: string; has_members?: boolean }>>(`/public/cek-saldo/${encodeURIComponent(token)}`)
 
 /** QR cek saldo toko: saldo pelanggan yang nomor HP + kodenya cocok. */
 export const checkBalance = (token: string, input: { phone: string; code: string }) =>
