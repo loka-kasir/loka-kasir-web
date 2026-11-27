@@ -42,9 +42,9 @@ describe('combined navigation', () => {
     expect(items[0].labelKey).toBe('navStock')
   })
 
-  it('simple mode hides advanced-only hubs but keeps their pages in product tabs', () => {
+  it('simple mode keeps Pelanggan & Kasbon visible and preserves product hub tabs', () => {
     const items = groupSidebarItems(NAV_ITEMS, true, true)
-    expect(items.some(item => item.labelKey === 'navCustomerHub')).toBe(false)
+    expect(items.some(item => item.labelKey === 'navCustomerHub')).toBe(true)
     const products = items.find(item => item.labelKey === 'navProductHub')!
     expect(products.activePaths).toContain('/inventory/transfers')
   })

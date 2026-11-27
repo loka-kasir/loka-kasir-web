@@ -75,6 +75,37 @@ export interface BusinessVertical {
   item_noun: string
 }
 
+export interface UserQuota {
+  active_users: number
+  included_users: number
+  included_users_per_outlet: number
+  active_outlets: number
+  paid_extra_users?: number
+  total_allowed_users?: number
+  extra_users: number
+  extra_user_monthly_price: number
+  requires_addon_now?: boolean
+  remaining_addon_months?: number
+  addon_slot_price?: number
+  next_addon_expiry?: string | null
+}
+
+export interface ProrataPreview {
+  target_plan: string
+  current_plan?: string
+  full_price: number
+  days_remaining: number
+  total_days?: number
+  remaining_value?: number
+  discount: number
+  amount_to_pay: number
+  is_prorata: boolean
+  extra_users?: number
+  extra_user_monthly_price?: number
+  duration_months?: number
+  extra_user_charge?: number
+}
+
 export interface Membership {
   id: string
   /** Paket terakhir: "trial" | "pro" | "pro-yearly" | "pro-3year" (legacy: "free") */
@@ -92,6 +123,8 @@ export interface Membership {
   days_left?: number
   /** true jika tier "pro" ATAU trial aktif belum kadaluarsa */
   is_pro: boolean
+  /** Kuota pengguna aktif bisnis (5 user/outlet + slot add-on). */
+  user_quota?: UserQuota | null
 }
 
 export interface Business {
@@ -1116,7 +1149,7 @@ export interface OutletConfig {
 // ─── PaymentOrder ──────────────────────────────────────────────────────────
 
 export type PaymentOrderStatus = 'pending' | 'paid' | 'expired' | 'cancelled'
-export type PaymentOrderType   = 'membership_upgrade' | 'outlet_addon' | 'gym_member_addon' | 'pos_transaction'
+export type PaymentOrderType   = 'membership_upgrade' | 'outlet_addon' | 'gym_member_addon' | 'user_addon' | 'pos_transaction'
 
 export interface PaymentOrder {
   referral_discount?: number

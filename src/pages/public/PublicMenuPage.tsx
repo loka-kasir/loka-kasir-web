@@ -960,7 +960,9 @@ function CustomizeSheet({
       }
     >
       {product.image && (
-        <img src={product.image} alt="" className="w-full h-40 object-cover rounded-2xl mb-4 bg-gray-100" />
+        <div className="w-full max-w-[260px] mx-auto aspect-square rounded-2xl overflow-hidden mb-4 bg-gray-100">
+          <img src={product.image} alt="" className="w-full h-full object-cover" />
+        </div>
       )}
       {product.description && <p className="text-sm text-gray-500 mb-4">{product.description}</p>}
       {needsVariant && (
@@ -1517,7 +1519,11 @@ function OrderPlaced({ menu, orderId, pickup, placedPickup = false, placedPrepay
     if (depositMode && menu?.deposit_pay) {
       return (
         <StatusShell tone="neutral" icon={<Loka.Wallet size={38} />} title={t('depositPayButton')} subtitle={where}>
-          <OrderDepositPay orderId={orderId} info={menu.deposit_pay} amount={order?.final_price} onCancel={() => setDepositMode(false)} />
+          {/* final_price di sini masih memuat selisih nominal unik QRIS yang
+              baru dibuka; server mengembalikannya sebelum memotong saldo.
+              Jangan tampilkan/cek batas dengan angka itu — Rp8.000 tampil
+              Rp8.046 dan tagihan pas di batas per transaksi tertolak. */}
+          <OrderDepositPay orderId={orderId} info={menu.deposit_pay} amount={undefined} onCancel={() => setDepositMode(false)} />
         </StatusShell>
       )
     }

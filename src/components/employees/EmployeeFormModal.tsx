@@ -6,8 +6,9 @@ import Modal from '@/components/ui/Modal'
 import SearchableSelect from '@/components/ui/SearchableSelect'
 import { createEmployee, updateEmployee } from '@/api/employees'
 import type { CreateEmployeePayload, UpdateEmployeePayload } from '@/api/employees'
-import type { Employee, Role, ShiftSchedule } from '@/types'
+import type { Employee, Role, ShiftSchedule, UserQuota } from '@/types'
 import { getErrorMessage, toTitleCase } from '@/lib/utils'
+import { formatMoneyIn } from '@/lib/money'
 import { t } from '@/lib/i18n'
 import { roleLabel } from '@/lib/roles'
 import { useBusinessOutlets } from '@/hooks/useBusinessOutlets'
@@ -75,9 +76,20 @@ interface Props {
   open: boolean
   onClose: () => void
   onSuccess: () => void
+  userQuota?: UserQuota | null
+  onRequireUserAddon?: (saved: Employee, quota: UserQuota) => void
 }
 
-export default function EmployeeFormModal({ employee, roles, schedules, open, onClose, onSuccess }: Props) {
+export default function EmployeeFormModal({
+  employee,
+  roles,
+  schedules,
+  open,
+  onClose,
+  onSuccess,
+  userQuota,
+  onRequireUserAddon,
+}: Props) {
   const qc = useQueryClient()
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const set = (field: keyof FormState, value: string | boolean) =>
@@ -127,6 +139,29 @@ export default function EmployeeFormModal({ employee, roles, schedules, open, on
     setOutletError('')
   }, [open, employee]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const paidExtra = Math.max(0, userQuota?.paid_extra_users ?? 0)
+  const allowedUsers = userQuota
+    ? Math.max(userQuota.included_users, userQuota.total_allowed_users ?? (userQuota.included_users + paidExtra))
+    : 0
+  const unitPrice = (userQuota?.extra_user_monthly_price ?? 0) > 0 ? userQuota!.extra_user_monthly_price : 5000
+  const remMonths = Math.max(1, userQuota?.remaining_addon_months ?? 1)
+  const slotPrice = userQuota?.addon_slot_price && userQuota.addon_slot_price > 0
+    ? userQuota.addon_slot_price
+    : unitPrice * remMonths
+  const addsActiveSlot =
+    !employee ||
+    (!employee.is_active && form.is_active) ||
+    (employee.is_active &&
+      (employee.role?.code ?? '').toUpperCase() === 'OWNER' &&
+      roleCode !== 'OWNER' &&
+      form.is_active)
+  const isOwnerRole = roleCode === 'OWNER'
+  const offeredRoles = roles.filter(
+    r => r.code?.toUpperCase() !== 'OWNER' || String(r.id) === String(employee?.role?.id ?? ''),
+  )
+  const quotaReached = !!userQuota && userQuota.active_users >= allowedUsers && addsActiveSlot && !isOwnerRole && form.is_active
+  const needsImmediateAddon = quotaReached && !!userQuota?.requires_addon_now
+
   const createMut = useMutation({
     mutationFn: () => {
       const payload: CreateEmployeePayload = {
@@ -134,13 +169,24 @@ export default function EmployeeFormModal({ employee, roles, schedules, open, on
         role_id: Number(form.role_id),
         shift_schedule_id: form.shift_schedule_id || null,
       }
+      if (needsImmediateAddon) payload.is_active = false
       applyIdentifier(payload, form)
       if (needsPIN(form.role_id)) payload.pin = form.pin
       if (needsPassword(form.role_id, roles)) payload.password = form.password
       payload.outlet_ids = outletIdsForCreate(assignment, roleCode, showOutletPicker)
       return createEmployee(payload)
     },
-    onSuccess: () => { toast.success(t('employeeAdded')); qc.invalidateQueries({ queryKey: ['employees'] }); onSuccess() },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['employees'] })
+      qc.invalidateQueries({ queryKey: ['membership'] })
+      if (needsImmediateAddon && userQuota && onRequireUserAddon) {
+        onSuccess()
+        onRequireUserAddon(res.data.data, userQuota)
+        return
+      }
+      toast.success(t('employeeAdded'))
+      onSuccess()
+    },
     onError: handleMutationError,
   })
 
@@ -150,7 +196,7 @@ export default function EmployeeFormModal({ employee, roles, schedules, open, on
         name: form.name.trim(),
         role_id: Number(form.role_id),
         shift_schedule_id: form.shift_schedule_id || null,
-        is_active: form.is_active,
+        is_active: needsImmediateAddon ? false : form.is_active,
       }
       applyIdentifier(payload, form)
       if (needsPIN(form.role_id) && form.pin) payload.pin = form.pin
@@ -161,7 +207,17 @@ export default function EmployeeFormModal({ employee, roles, schedules, open, on
       if (outletIds !== undefined) payload.outlet_ids = outletIds
       return updateEmployee(employee!.id, payload)
     },
-    onSuccess: () => { toast.success(t('employeeUpdated')); qc.invalidateQueries({ queryKey: ['employees'] }); onSuccess() },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['employees'] })
+      qc.invalidateQueries({ queryKey: ['membership'] })
+      if (needsImmediateAddon && userQuota && onRequireUserAddon) {
+        onSuccess()
+        onRequireUserAddon(res.data.data, userQuota)
+        return
+      }
+      toast.success(t('employeeUpdated'))
+      onSuccess()
+    },
     onError: handleMutationError,
   })
 
@@ -199,6 +255,23 @@ export default function EmployeeFormModal({ employee, roles, schedules, open, on
   return (
     <Modal open={open} onClose={onClose} title={employee ? t('employeeEdit') : t('employeeAdd')} size="sm">
       <Form onSubmit={handleSubmit} className="space-y-4">
+        {quotaReached && userQuota && (
+          <div className="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-3.5 py-2.5 text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
+            {needsImmediateAddon
+              ? t('uqFormAddonRequiredHint', {
+                  active: userQuota.active_users,
+                  allowed: allowedUsers,
+                  unitPrice: formatMoneyIn(unitPrice, 'IDR'),
+                  months: remMonths,
+                  slotPrice: formatMoneyIn(slotPrice, 'IDR'),
+                })
+              : t('uqFormMonthlyHint', {
+                  active: userQuota.active_users,
+                  included: userQuota.included_users,
+                  unitPrice: formatMoneyIn(unitPrice, 'IDR'),
+                })}
+          </div>
+        )}
         <div>
           <label className="block text-xs font-medium text-foreground mb-1">{t('labelName')} <span className="text-red-500 dark:text-red-400">*</span></label>
           <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder={t('employeeNamePlaceholder')}
@@ -219,7 +292,7 @@ export default function EmployeeFormModal({ employee, roles, schedules, open, on
         <div>
           <label className="block text-xs font-medium text-foreground mb-1">{t('employeeRole')} <span className="text-red-500 dark:text-red-400">*</span></label>
           <SearchableSelect value={form.role_id} onChange={(v) => set('role_id', v)} className="w-full"
-            options={roles.map(r => ({ value: String(r.id), label: roleLabel(r) }))}
+            options={offeredRoles.map(r => ({ value: String(r.id), label: roleLabel(r) }))}
             placeholder={t('employeePickRole')} label={t('employeeRole')} />
         </div>
         {needsPassword(form.role_id, roles) && (
@@ -300,7 +373,13 @@ export default function EmployeeFormModal({ employee, roles, schedules, open, on
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-border text-muted-foreground text-sm font-semibold rounded-xl hover:bg-muted transition">{t('actionCancel')}</button>
           <button type="submit" disabled={isPending} className="flex-1 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-60 transition">
-            {isPending ? t('saving') : employee ? t('actionSave') : t('employeeAdd')}
+            {isPending
+              ? t('saving')
+              : needsImmediateAddon
+                ? t('uqSaveAndChooseAddon')
+                : employee
+                  ? t('actionSave')
+                  : t('employeeAdd')}
           </button>
         </div>
       </Form>

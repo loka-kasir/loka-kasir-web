@@ -89,6 +89,9 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 && !isRedirectingToLogin) {
       isRedirectingToLogin = true
+      if (errorCodeOf(error) === 'ACCOUNT_INACTIVE') {
+        toast.error(getErrorMessage(error))
+      }
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       useOutletStore.getState().setOutlet(null)

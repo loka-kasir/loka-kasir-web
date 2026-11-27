@@ -3,19 +3,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Store, CheckCircle2, AlertTriangle, Clock, XCircle,
   PlusCircle, RefreshCw, ChevronRight,
-  Lock, Plus,
+  Lock, Plus, Minus, Users,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Header from '@/components/layout/Header'
 import Modal from '@/components/ui/Modal'
 import PaymentOrderModal from '@/components/ui/PaymentOrderModal'
 import CurrentPlanBanner from '@/components/membership/CurrentPlanBanner'
+import UserQuotaSection from '@/components/membership/UserQuotaSection'
 import ReferralCard from '@/components/membership/ReferralCard'
 import BillingToggle from '@/components/membership/BillingToggle'
 import type { BillingCycle } from '@/components/membership/BillingToggle'
 import { ProPlanCard } from '@/components/membership/PlanCard'
 import { getMyOutlets, createOutlet, deleteOutlet } from '@/api/outlets'
-import { getActiveMembership } from '@/api/membership'
+import { getActiveMembership, getUpgradePreview } from '@/api/membership'
 import { createPaymentOrder } from '@/api/payment'
 import GymMemberQuotaSection from '@/pages/membership/GymMemberQuotaSection'
 import { formatDate, getErrorMessage } from '@/lib/utils'
@@ -24,7 +25,7 @@ import { deriveStatus } from '@/store/subscriptionStore'
 import type { Outlet, Membership, PaymentOrder } from '@/types'
 import { useSubscriptionPrices } from '@/hooks/useSubscriptionPrices'
 import { t } from '@/lib/i18n'
-import { formatQuantity } from '@/lib/money'
+import { formatMoneyIn, formatQuantity } from '@/lib/money'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -74,8 +75,12 @@ export default function MembershipPage() {
   const [paymentOrderOpen, setPaymentOrderOpen] = useState(false)
   const [paymentTitle, setPaymentTitle]       = useState(t('payCompletePayment'))
 
-  // Business-level tier upgrade state (for loading indicator)
+  // Business-level tier upgrade state (for loading indicator & extra-user prompt)
   const [upgradeTarget, setUpgradeTarget] = useState<'pro' | null>(null)
+  const [proConfirmOpen, setProConfirmOpen] = useState(false)
+  const [proWantsExtraUsers, setProWantsExtraUsers] = useState(false)
+  const [proExtraQty, setProExtraQty] = useState(1)
+  const [proExtraMonths, setProExtraMonths] = useState(1)
 
   // Tambah outlet baru (Pro only)
   const [addOutletOpen, setAddOutletOpen]         = useState(false)
@@ -119,8 +124,15 @@ export default function MembershipPage() {
     queryFn: () => getActiveMembership(),
   })
 
+  const { data: previewData } = useQuery({
+    queryKey: ['upgrade-preview', referralPlan],
+    queryFn: () => getUpgradePreview(referralPlan),
+    enabled: !!businessId,
+  })
+
   const outlets: Outlet[]              = outletData?.data?.data ?? []
   const membership: Membership | null  = membershipData?.data?.data ?? null
+  const preview                        = previewData?.data?.data ?? null
 
   // Outlet pertama (created_at paling awal) selalu gratis — include dalam semua paket.
   // Hanya outlet ke-2+ yang butuh add-on berbayar.
@@ -134,6 +146,7 @@ export default function MembershipPage() {
   const expiredCount = addOnOutlets.filter((o) => needsRenewal(o)).length
 
   const [gymQuotaTitle, setGymQuotaTitle] = useState('')
+  const [userAddonTitle, setUserAddonTitle] = useState('')
 
   // ── Buat payment order (dipakai untuk membership & outlet add-on) ──────────
   const createOrderMut = useMutation({
@@ -151,6 +164,8 @@ export default function MembershipPage() {
         setPaymentTitle(t('memUpgradeToPlan', { plan: 'Pro' }))
       } else if (vars.type === 'gym_member_addon') {
         setPaymentTitle(gymQuotaTitle || t('gqTitle'))
+      } else if (vars.type === 'user_addon') {
+        setPaymentTitle(userAddonTitle || t('uqAddonTitle'))
       } else {
         setPaymentTitle(t('memActivateOutletSub'))
       }
@@ -190,7 +205,28 @@ export default function MembershipPage() {
           : <CurrentPlanBanner membership={membership} />
         }
 
-        <ReferralCard plan={referralPlan} amount={prices.priceOf(referralPlan)?.charge_amount} />
+        <UserQuotaSection
+          quota={membership?.user_quota}
+          showManageLink
+          busy={createOrderMut.isPending}
+          onBuySlots={(qty, months, title) => {
+            setUserAddonTitle(title)
+            createOrderMut.mutate({
+              business_id: businessId,
+              type: 'user_addon',
+              quantity: qty,
+              months,
+              plan: `user-addon:${qty}:${months}`,
+              email: userEmail,
+            })
+          }}
+        />
+
+        <ReferralCard
+          plan={referralPlan}
+          amount={prices.priceOf(referralPlan)?.charge_amount}
+          extraUserCharge={preview?.extra_user_charge ?? 0}
+        />
 
         {/* ── Plan comparison ────────────────────────────────────────────── */}
         <div className="mx-auto w-full max-w-5xl">
@@ -213,6 +249,8 @@ export default function MembershipPage() {
           <div className="pt-2">
             <ProPlanCard
               billingCycle={billingCycle}
+              preview={preview}
+              userQuota={membership?.user_quota}
               // Hanya paket yang MASIH aktif yang terkunci sebagai "Aktif";
               // paket terakhir yang sudah berakhir harus bisa dibeli lagi.
               isCurrent={deriveStatus(membership) === 'ACTIVE' && membership?.type === (
@@ -224,17 +262,20 @@ export default function MembershipPage() {
               )}
               isLoading={upgradeTarget === 'pro' && createOrderMut.isPending}
               onUpgrade={() => {
-                setUpgradeTarget('pro')
-                createOrderMut.mutate({
-                  business_id: businessId,
-                  type: 'membership_upgrade',
-                  plan: billingCycle === 'three-year'
-                    ? 'pro-3year'
-                    : billingCycle === 'yearly'
-                      ? 'pro-yearly'
-                      : 'pro',
-                  email: userEmail,
-                })
+                if (billingCycle === 'monthly') {
+                  setUpgradeTarget('pro')
+                  createOrderMut.mutate({
+                    business_id: businessId,
+                    type: 'membership_upgrade',
+                    plan: referralPlan,
+                    email: userEmail,
+                  })
+                  return
+                }
+                setProWantsExtraUsers(false)
+                setProExtraQty(1)
+                setProExtraMonths(1)
+                setProConfirmOpen(true)
               }}
             />
           </div>
@@ -456,7 +497,7 @@ export default function MembershipPage() {
           setPaymentOrder(null)
           setPendingNewOutletId(null)
         }}
-        invalidateKeys={[['membership'], ['my-outlets'], ['referral'], ['gym-member-quota']]}
+        invalidateKeys={[['membership'], ['upgrade-preview'], ['employees'], ['my-outlets'], ['referral'], ['gym-member-quota']]}
         onPaymentFailed={() => {
           if (pendingNewOutletId) {
             deleteOutletMut.mutate(pendingNewOutletId)
@@ -558,6 +599,201 @@ export default function MembershipPage() {
           </div>
         </div>
       </Modal>
+
+      {/* ── Pro subscription confirm + optional extra users modal ─────────── */}
+      {(() => {
+        const planMonths = billingCycle === 'three-year' ? 36 : billingCycle === 'yearly' ? 12 : 1
+        const planUnitPrice = preview?.extra_user_monthly_price || membership?.user_quota?.extra_user_monthly_price || 5000
+        const existingExtra = preview?.extra_users ?? membership?.user_quota?.extra_users ?? 0
+        const existingExtraCharge = preview?.extra_user_charge ?? (existingExtra > 0 ? existingExtra * planUnitPrice * planMonths : 0)
+        const baseAmountIdr = preview?.amount_to_pay ?? ((prices.priceOf(referralPlan)?.charge_amount ?? 0) + existingExtraCharge)
+        const basePlanOnlyIdr = Math.max(0, baseAmountIdr - existingExtraCharge)
+        const effectiveMonths = planMonths > 1 ? Math.min(planMonths, Math.max(1, proExtraMonths)) : 1
+        const optionalCharge = proWantsExtraUsers ? proExtraQty * effectiveMonths * planUnitPrice : 0
+        const totalIdr = baseAmountIdr + optionalCharge
+        const presets: number[] = []
+        for (const m of [1, 3, 6]) {
+          if (m < planMonths) presets.push(m)
+        }
+        if (planMonths > 1 && !presets.includes(planMonths)) presets.push(planMonths)
+
+        return (
+          <Modal
+            open={proConfirmOpen}
+            onClose={() => setProConfirmOpen(false)}
+            title={t('memConfirmProTitle')}
+            size="sm"
+          >
+            <div className="space-y-4">
+              <div className="rounded-xl border border-border p-3.5 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Users size={16} className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{t('uqAskAddExtraUsers')}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {t('uqAskAddExtraUsersHint', {
+                        perOutlet: membership?.user_quota?.included_users_per_outlet ?? 5,
+                        unitPrice: formatMoneyIn(planUnitPrice, 'IDR'),
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProWantsExtraUsers(false)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition ${
+                      !proWantsExtraUsers
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-card text-foreground border-border hover:bg-muted'
+                    }`}
+                  >
+                    {t('uqAskAddExtraUsersNo')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProWantsExtraUsers(true)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition ${
+                      proWantsExtraUsers
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-card text-foreground border-border hover:bg-muted'
+                    }`}
+                  >
+                    {t('uqAskAddExtraUsersYes')}
+                  </button>
+                </div>
+
+                {proWantsExtraUsers && (
+                  <div className="space-y-3 pt-1 border-t border-border">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-foreground">{t('uqAddonQtyLabel')}</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={proExtraQty <= 1}
+                          onClick={() => setProExtraQty((n) => Math.max(1, n - 1))}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40"
+                        >
+                          <Minus size={13} />
+                        </button>
+                        <span className="w-9 text-center text-sm font-bold text-foreground">+{proExtraQty}</span>
+                        <button
+                          type="button"
+                          disabled={proExtraQty >= 50}
+                          onClick={() => setProExtraQty((n) => Math.min(50, n + 1))}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {planMonths > 1 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-xs font-medium text-foreground">{t('uqAddonDurationLabel')}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={effectiveMonths <= 1}
+                              onClick={() => setProExtraMonths((n) => Math.max(1, n - 1))}
+                              className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40"
+                            >
+                              <Minus size={13} />
+                            </button>
+                            <span className="min-w-[4rem] text-center text-sm font-bold text-foreground">
+                              {t('uqAddonMonthsShort', { months: effectiveMonths })}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={effectiveMonths >= planMonths}
+                              onClick={() => setProExtraMonths((n) => Math.min(planMonths, n + 1))}
+                              className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-muted disabled:opacity-40"
+                            >
+                              <Plus size={13} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {presets.map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setProExtraMonths(preset)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition ${
+                                effectiveMonths === preset
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'bg-card text-foreground border-border hover:bg-muted'
+                              }`}
+                            >
+                              {preset === planMonths
+                                ? t('uqAddonUntilPlanEnd', { months: planMonths })
+                                : t('uqAddonMonthsShort', { months: preset })}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-muted rounded-xl p-3.5 space-y-2">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Pro ({billingCycle === 'three-year' ? t('planPerThreeYears') : billingCycle === 'yearly' ? t('planPerYear') : t('planPerMonth')})</span>
+                  <span>{formatMoneyIn(basePlanOnlyIdr, 'IDR')}</span>
+                </div>
+                {existingExtra > 0 && existingExtraCharge > 0 && (
+                  <div className="flex justify-between text-xs text-amber-700 dark:text-amber-300">
+                    <span>{t('uqExtraBreakdown', { extra: existingExtra, months: planMonths, unitPrice: formatMoneyIn(planUnitPrice, 'IDR') })}</span>
+                    <span>+{formatMoneyIn(existingExtraCharge, 'IDR')}</span>
+                  </div>
+                )}
+                {optionalCharge > 0 && (
+                  <div className="flex justify-between text-xs text-blue-700 dark:text-blue-300 font-medium">
+                    <span>{t('uqBundledExtraUsersRow', { qty: proExtraQty, months: effectiveMonths, unitPrice: formatMoneyIn(planUnitPrice, 'IDR') })}</span>
+                    <span>+{formatMoneyIn(optionalCharge, 'IDR')}</span>
+                  </div>
+                )}
+                <div className="border-t border-border pt-2 flex justify-between items-center">
+                  <span className="text-sm font-medium text-foreground">{t('memTotalPayable')}</span>
+                  <span className="text-base font-bold text-foreground">{formatMoneyIn(totalIdr, 'IDR')}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setProConfirmOpen(false)}
+                  className="flex-1 py-2.5 border border-border text-muted-foreground text-sm font-medium rounded-xl hover:bg-muted transition"
+                >
+                  {t('actionCancel')}
+                </button>
+                <button
+                  type="button"
+                  disabled={createOrderMut.isPending}
+                  onClick={() => {
+                    setProConfirmOpen(false)
+                    setUpgradeTarget('pro')
+                    createOrderMut.mutate({
+                      business_id: businessId,
+                      type: 'membership_upgrade',
+                      plan: referralPlan,
+                      ...(proWantsExtraUsers ? { quantity: proExtraQty } : {}),
+                      ...(proWantsExtraUsers && planMonths > 1 ? { months: effectiveMonths } : {}),
+                      email: userEmail,
+                    })
+                  }}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition"
+                >
+                  {createOrderMut.isPending ? t('processing') : t('memContinueToPayment')}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )
+      })()}
 
       {/* ── Outlet confirm modal ───────────────────────────────────────────── */}
       <Modal

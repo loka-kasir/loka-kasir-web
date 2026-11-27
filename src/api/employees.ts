@@ -13,6 +13,7 @@ export interface CreateEmployeePayload {
   username?: string | null
   pin?: string | null
   password?: string | null
+  is_active?: boolean
   shift_schedule_id?: string | null
   /** `[]` atau tidak dikirim = bertugas di semua outlet. */
   outlet_ids?: string[]

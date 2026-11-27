@@ -2,11 +2,13 @@ import { Check, Crown, Star } from 'lucide-react'
 import { useSubscriptionPrices } from '@/hooks/useSubscriptionPrices'
 import { formatMoneyIn, minorToMajor } from '@/lib/money'
 import { t } from '@/lib/i18n'
+import type { ProrataPreview, UserQuota } from '@/types'
 import type { BillingCycle } from './BillingToggle'
 
 const proFeatures = () => [
   t('planFeatRegisterApp'),
   t('planFeatCustomerStaff'),
+  t('uqPlanFeature'),
   t('planFeatTxReports'),
   t('planFeatMultiOutlet'),
   t('planFeatAdvStockPro'),
@@ -20,20 +22,28 @@ interface ProPlanCardProps {
   isCurrent: boolean
   isLoading: boolean
   onUpgrade: () => void
+  preview?: ProrataPreview | null
+  userQuota?: UserQuota | null
 }
 
-export function ProPlanCard({ billingCycle, isCurrent, isLoading, onUpgrade }: ProPlanCardProps) {
+export function ProPlanCard({ billingCycle, isCurrent, isLoading, onUpgrade, preview, userQuota }: ProPlanCardProps) {
   const prices = useSubscriptionPrices()
   const plan = billingCycle === 'three-year'
     ? 'pro-3year'
     : billingCycle === 'yearly'
       ? 'pro-yearly'
       : 'pro'
+  const durationMonths = billingCycle === 'three-year' ? 36 : billingCycle === 'yearly' ? 12 : 1
   const price = prices.priceOf(plan)
   const suffix = billingCycle === 'three-year' ? t('planPerThreeYears') : billingCycle === 'yearly' ? t('planPerYear') : t('planPerMonth')
   const displayPrice = price
     ? formatMoneyIn(minorToMajor(price.display_amount, price.display_currency), price.display_currency)
     : ''
+
+  const extraUsers = preview?.extra_users ?? userQuota?.extra_users ?? 0
+  const extraUnitPrice = preview?.extra_user_monthly_price || userQuota?.extra_user_monthly_price || 5000
+  const extraCharge = preview?.extra_user_charge ?? (extraUsers > 0 ? extraUsers * extraUnitPrice * durationMonths : 0)
+  const totalPayableIdr = preview?.amount_to_pay ?? ((price?.charge_amount ?? 0) + extraCharge)
 
   return (
     <div className="relative rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 p-6 text-white shadow-2xl shadow-blue-500/25 ring-2 ring-blue-400 ring-offset-2 md:p-8">
@@ -59,6 +69,27 @@ export function ProPlanCard({ billingCycle, isCurrent, isLoading, onUpgrade }: P
           <p className="mt-4 text-sm leading-relaxed text-blue-100">
             {t('planInfrastructureIncluded')}
           </p>
+
+          {extraUsers > 0 && extraCharge > 0 && (
+            <div className="mt-4 rounded-xl bg-white/10 ring-1 ring-white/20 p-3 space-y-1 text-xs">
+              <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
+                <span>
+                  {t('uqExtraBreakdown', {
+                    extra: extraUsers,
+                    months: durationMonths,
+                    unitPrice: formatMoneyIn(extraUnitPrice, 'IDR'),
+                  })}
+                </span>
+                <span>+{formatMoneyIn(extraCharge, 'IDR')}</span>
+              </div>
+              <p className="text-blue-100">
+                {t('uqExtraTotalNote', {
+                  total: formatMoneyIn(totalPayableIdr, 'IDR'),
+                  extra: extraUsers,
+                })}
+              </p>
+            </div>
+          )}
 
           <button
             onClick={onUpgrade}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Plus, Phone, Mail, MapPin, StickyNote, Gift } from 'lucide-react'
+import { Search, Plus, Phone, Mail, MapPin, StickyNote, Gift, CreditCard } from 'lucide-react'
 import { EditButton, DeleteButton } from '@/components/ui/RowActions'
 import toast from 'react-hot-toast'
 import Header from '@/components/layout/Header'
@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge'
 import Pagination from '@/components/ui/Pagination'
 import CustomerFormModal from '@/components/customers/CustomerFormModal'
 import CustomerLoyaltyModal from '@/components/customers/CustomerLoyaltyModal'
+import MemberCardPoolModal from '@/components/customers/MemberCardPoolModal'
 import { getCustomersByBusiness, deleteCustomer } from '@/api/customers'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -29,6 +30,7 @@ export default function CustomersPage() {
   const [showForm, setShowForm] = useState(false)
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null)
   const [loyaltyCustomer, setLoyaltyCustomer] = useState<Customer | null>(null)
+  const [showCardPool, setShowCardPool] = useState(false)
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['customers', businessId, { page, search }],
@@ -160,6 +162,9 @@ export default function CustomersPage() {
             <p className="text-sm text-muted-foreground md:ml-auto shrink-0">
               {t('totalColon')} <span className="font-semibold text-foreground">{pagination?.total ?? 0}</span>
             </p>
+            <button onClick={() => setShowCardPool(true)} className="flex items-center justify-center gap-2 px-3.5 py-2 border border-border bg-card text-foreground text-sm font-semibold rounded-xl hover:bg-muted transition shrink-0">
+              <CreditCard size={14} /> Kartu Member
+            </button>
             <button onClick={openCreate} className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition shrink-0">
               <Plus size={14} /> {t('customerAdd')}
             </button>
@@ -258,6 +263,8 @@ export default function CustomersPage() {
           onClose={() => setLoyaltyCustomer(null)}
         />
       )}
+
+      <MemberCardPoolModal open={showCardPool} onClose={() => setShowCardPool(false)} />
     </div>
   )
 }

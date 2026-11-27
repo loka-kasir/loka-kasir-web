@@ -8,7 +8,7 @@ import { formatMoneyIn } from '@/lib/money'
 import { getErrorMessage, formatDate } from '@/lib/utils'
 
 const rupiah = (n: number) => formatMoneyIn(n, 'IDR')
-export default function ReferralCard({ plan, amount }: { plan: string; amount?: number }) {
+export default function ReferralCard({ plan, amount, extraUserCharge = 0 }: { plan: string; amount?: number; extraUserCharge?: number }) {
   const owner = useAuthStore((s) => s.user?.role.code === 'OWNER')
   const qc = useQueryClient()
   const [code, setCode] = useState(() => sessionStorage.getItem('referral-code') ?? '')
@@ -53,7 +53,7 @@ export default function ReferralCard({ plan, amount }: { plan: string; amount?: 
       {[[data.balance, 'Saldo tersedia'], [data.pending_reward, 'Menunggu 7 hari'], [data.reserved, 'Dicadangkan untuk tagihan']].map(([n, label]) => <div key={String(label)} className="rounded-xl bg-muted p-3"><p className="font-bold">{rupiah(Number(n))}</p><p className="text-xs text-muted-foreground">{label}</p></div>)}
     </div>
     <p className="text-xs text-muted-foreground">Saldo otomatis memotong maksimal 50% tagihan Pro bulanan atau tahunan. Berlaku 7 hari setelah pembayaran teman berhasil, tidak kedaluwarsa, dan tidak dapat dicairkan. Satu reward per pelanggan baru. Referral sendiri atau pemilik yang sama tidak berlaku. Reward pembayaran yang direfund dapat dibatalkan.</p>
-    {amount !== undefined && discount > 0 && <p className="rounded-xl bg-green-50 dark:bg-green-500/10 p-3 text-sm">Potongan untuk paket yang dipilih: <strong>{rupiah(discount)}</strong>. Perkiraan pembayaran: <strong>{rupiah(amount - discount)}</strong>. Nominal akhir dikonfirmasi pada tagihan.</p>}
+    {amount !== undefined && discount > 0 && <p className="rounded-xl bg-green-50 dark:bg-green-500/10 p-3 text-sm">Potongan untuk paket yang dipilih: <strong>{rupiah(discount)}</strong>. Perkiraan pembayaran: <strong>{rupiah(amount + extraUserCharge - discount)}</strong>. Nominal akhir dikonfirmasi pada tagihan.</p>}
     {data.applied_code && (sales
       ? <p className="text-sm">Kode mitra sales <strong>{data.applied_code}</strong>{salesSavings}</p>
       : <p className="text-sm">Kode yang digunakan: <strong>{data.applied_code}</strong>. Diskon berlaku untuk pembayaran Pro bulanan atau tahunan pertama.</p>)}

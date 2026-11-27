@@ -10,11 +10,15 @@ import Pagination from '@/components/ui/Pagination'
 import Badge from '@/components/ui/Badge'
 import EmployeeFormModal from '@/components/employees/EmployeeFormModal'
 import ResetPinModal from '@/components/employees/ResetPinModal'
+import UserQuotaSection, { UserAddonPickerModal } from '@/components/membership/UserQuotaSection'
+import PaymentOrderModal from '@/components/ui/PaymentOrderModal'
 import { getEmployees, deleteEmployee } from '@/api/employees'
+import { getActiveMembership } from '@/api/membership'
+import { createPaymentOrder } from '@/api/payment'
 import { getShiftSchedules } from '@/api/shifts'
 import { getRoles } from '@/api/master'
 import { useAuthStore } from '@/store/authStore'
-import type { Employee, Role, ShiftSchedule } from '@/types'
+import type { Employee, PaymentOrder, Role, ShiftSchedule } from '@/types'
 import { formatDate, getErrorMessage, toTitleCase } from '@/lib/utils'
 import { t } from '@/lib/i18n'
 import { roleLabel } from '@/lib/roles'
@@ -36,6 +40,33 @@ export default function EmployeesPage({ embedded = false }: { embedded?: boolean
   const [showForm, setShowForm] = useState(false)
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null)
   const [resetPinEmployee, setResetPinEmployee] = useState<Employee | null>(null)
+  const [paymentOrder, setPaymentOrder] = useState<PaymentOrder | null>(null)
+  const [paymentOpen, setPaymentOpen] = useState(false)
+  const [paymentTitle, setPaymentTitle] = useState('')
+  const [pendingEmployeeName, setPendingEmployeeName] = useState<string | null>(null)
+  const [addonEmployee, setAddonEmployee] = useState<Employee | null>(null)
+
+  const { data: membershipData } = useQuery({
+    queryKey: ['membership'],
+    queryFn: () => getActiveMembership(),
+    enabled: !!businessId,
+  })
+  const userQuota = membershipData?.data?.data?.user_quota ?? null
+
+  const createAddonOrderMut = useMutation({
+    mutationFn: createPaymentOrder,
+    onSuccess: (res) => {
+      setPaymentOrder(res.data.data)
+      setPaymentOpen(true)
+    },
+    onError: (err) => {
+      toast.error(getErrorMessage(err))
+      if (pendingEmployeeName) {
+        toast(t('uqSavedInactivePending', { name: pendingEmployeeName }))
+        setPendingEmployeeName(null)
+      }
+    },
+  })
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['employees', { page, limit: 10, search }],
@@ -66,7 +97,11 @@ export default function EmployeesPage({ embedded = false }: { embedded?: boolean
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteEmployee(id),
-    onSuccess: () => { toast.success(t('employeeDeleted')); qc.invalidateQueries({ queryKey: ['employees'] }) },
+    onSuccess: () => {
+      toast.success(t('employeeDeleted'))
+      qc.invalidateQueries({ queryKey: ['employees'] })
+      qc.invalidateQueries({ queryKey: ['membership'] })
+    },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
@@ -160,7 +195,24 @@ export default function EmployeesPage({ embedded = false }: { embedded?: boolean
       {!embedded && (
         <Header title={t('navEmployees')} subtitle={t('employeePageSubtitle')} />
       )}
-      <div className="page-content flex-1 min-h-0 min-w-0 overflow-y-auto p-4 md:p-6">
+      <div className="page-content flex-1 min-h-0 min-w-0 overflow-y-auto p-4 md:p-6 space-y-4">
+        <UserQuotaSection
+          quota={userQuota}
+          compact
+          busy={createAddonOrderMut.isPending}
+          onBuySlots={(qty, months, title) => {
+            setPendingEmployeeName(null)
+            setPaymentTitle(title)
+            createAddonOrderMut.mutate({
+              business_id: businessId,
+              type: 'user_addon',
+              quantity: qty,
+              months,
+              plan: `user-addon:${qty}:${months}`,
+              email: user?.email ?? '',
+            })
+          }}
+        />
         <div className="bg-card rounded-2xl border border-border">
           <div className="px-5 py-4 border-b border-border flex flex-wrap items-center gap-3">
             <div className="relative flex-1 max-w-xs">
@@ -203,6 +255,72 @@ export default function EmployeesPage({ embedded = false }: { embedded?: boolean
         open={showForm}
         onClose={closeForm}
         onSuccess={closeForm}
+        userQuota={userQuota}
+        onRequireUserAddon={(saved, quota) => {
+          if ((quota.remaining_addon_months ?? 1) > 1) {
+            setAddonEmployee(saved)
+            return
+          }
+          setPendingEmployeeName(saved.name)
+          setPaymentTitle(t('uqAddonPayForEmployee', { name: saved.name }))
+          createAddonOrderMut.mutate({
+            business_id: businessId,
+            type: 'user_addon',
+            reference_id: saved.id,
+            quantity: 1,
+            months: 1,
+            plan: 'user-addon:1:1',
+            email: user?.email ?? '',
+          })
+        }}
+      />
+
+      {userQuota && addonEmployee && (
+        <UserAddonPickerModal
+          open={!!addonEmployee}
+          onClose={() => {
+            const name = addonEmployee.name
+            setAddonEmployee(null)
+            toast(t('uqSavedInactivePending', { name }))
+          }}
+          quota={userQuota}
+          fixedQty={1}
+          employeeName={addonEmployee.name}
+          busy={createAddonOrderMut.isPending}
+          onConfirm={(_qty, months, title) => {
+            const emp = addonEmployee
+            setAddonEmployee(null)
+            setPendingEmployeeName(emp.name)
+            setPaymentTitle(title)
+            createAddonOrderMut.mutate({
+              business_id: businessId,
+              type: 'user_addon',
+              reference_id: emp.id,
+              quantity: 1,
+              months,
+              plan: `user-addon:1:${months}`,
+              email: user?.email ?? '',
+            })
+          }}
+        />
+      )}
+
+      <PaymentOrderModal
+        open={paymentOpen}
+        order={paymentOrder}
+        title={paymentTitle}
+        onClose={() => {
+          setPaymentOpen(false)
+          setPaymentOrder(null)
+          setPendingEmployeeName(null)
+        }}
+        invalidateKeys={[['employees'], ['membership'], ['upgrade-preview']]}
+        onPaymentFailed={() => {
+          if (pendingEmployeeName) {
+            toast(t('uqSavedInactivePending', { name: pendingEmployeeName }))
+            setPendingEmployeeName(null)
+          }
+        }}
       />
 
       {resetPinEmployee && (

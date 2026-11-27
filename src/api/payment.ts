@@ -6,6 +6,10 @@ export interface CreatePaymentOrderPayload {
   type: PaymentOrderType
   reference_id?: string
   plan?: string
+  /** Jumlah slot tambahan untuk type = "user_addon" (bawaan 1). */
+  quantity?: number
+  /** Durasi bulan yang dipilih untuk type = "user_addon" (1..sisa bulan paket). */
+  months?: number
   /** Email customer untuk notifikasi pembayaran Duitku. */
   email?: string
 }
