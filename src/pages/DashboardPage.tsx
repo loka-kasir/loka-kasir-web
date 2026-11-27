@@ -19,6 +19,7 @@ import { Link } from 'react-router-dom'
 import { ArrowUpRight } from 'lucide-react'
 import { NAV_ITEMS, navLabel, navDescription, roleAllowsNav } from '@/components/layout/navItems'
 import QueryErrorState from '@/components/ui/QueryErrorState'
+import { isRevenueHidden } from '@/lib/revenueHidden'
 
 export default function DashboardPage() {
   const { selected: selectedOutlet } = useOutletStore()
@@ -42,6 +43,7 @@ export default function DashboardPage() {
   })
 
   const summary = homeData?.data?.data?.today_summary
+  const revenueHidden = isRevenueHidden(homeData)
   const topProducts = homeData?.data?.data?.top_products ?? []
   const recentTx = txData?.data?.data?.results ?? []
 
@@ -64,7 +66,7 @@ export default function DashboardPage() {
         <SetupChecklistCard />
         {showSalesOverview
           ? <DashboardSalesOverview outletId={outletId} />
-          : <DashboardStatCards summary={summary} loading={homeLoading} />}
+          : <DashboardStatCards summary={summary} loading={homeLoading} revenueHidden={revenueHidden} />}
 
         <ActionCenterCard home={homeData?.data?.data} outletId={outletId} />
 

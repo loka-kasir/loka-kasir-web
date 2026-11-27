@@ -359,7 +359,7 @@ export default function PublicMenuPage({ mode = 'table' }: { mode?: MenuMode }) 
       item_type: 'PRODUCT', reference_id: p.id, quantity: 1, attributes: [],
     }, p.id)
     fly(source?.closest('[data-product-card]')?.querySelector('[data-thumb]') ?? source, { image: p.image, label: initials(p.name) })
-    toast.success(`${p.name} ditambahkan`)
+    toast.success(t('menuItemAdded', { name: p.name }))
   }
 
   // Nama & WA wajib di kedua jalur. Pesan online: itulah satu-satunya cara
@@ -945,7 +945,7 @@ function CustomizeSheet({
       quantity: 1,
       attributes: chosenAddons.map((a) => ({ product_attribute_id: a.id, additional_price: a.price })),
     }, addButtonRef.current)
-    toast.success(`${name} ditambahkan`)
+    toast.success(t('menuItemAdded', { name }))
     onClose()
   }
 

@@ -76,6 +76,31 @@ export const listMemberCards = (params?: {
 }) =>
   api.get<{ status: boolean; data: MemberCardPoolPage }>('/member-cards', { params })
 
+/**
+ * Semua halaman `/member-cards` (server membatasi 200 per halaman). Tanpa ini
+ * kartu ke-201 dst. — batch kedua toko yang sudah punya 200 kartu — tidak
+ * tampil di daftar dan tidak bisa diaktifkan maupun dicetak.
+ */
+export const listAllMemberCards = async (params?: {
+  status?: string
+  search?: string
+  batch_label?: string
+}) => {
+  const limit = 200
+  const first = await listMemberCards({ ...params, page: 1, limit })
+  const firstPage = first.data?.data
+  if (!firstPage) return first
+  const items = [...(firstPage.items ?? [])]
+  const total = firstPage.total_items ?? items.length
+  for (let page = 2; items.length < total && page <= 50; page++) {
+    const next = await listMemberCards({ ...params, page, limit })
+    const more = next.data?.data?.items ?? []
+    if (more.length === 0) break
+    items.push(...more)
+  }
+  return { ...first, data: { ...first.data, data: { ...firstPage, items } } }
+}
+
 export const createMemberCardBatch = (data: { count: number; batch_label?: string }) =>
   api.post<{ status: boolean; data: { items: MemberCardPoolItem[]; count: number } }>(
     '/member-cards/batch',

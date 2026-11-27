@@ -163,7 +163,7 @@ export default function CustomersPage() {
               {t('totalColon')} <span className="font-semibold text-foreground">{pagination?.total ?? 0}</span>
             </p>
             <button onClick={() => setShowCardPool(true)} className="flex items-center justify-center gap-2 px-3.5 py-2 border border-border bg-card text-foreground text-sm font-semibold rounded-xl hover:bg-muted transition shrink-0">
-              <CreditCard size={14} /> Kartu Member
+              <CreditCard size={14} /> {t('mcpButton')}
             </button>
             <button onClick={openCreate} className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition shrink-0">
               <Plus size={14} /> {t('customerAdd')}

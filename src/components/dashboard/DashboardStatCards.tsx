@@ -8,25 +8,29 @@ import { t } from '@/lib/i18n'
 interface DashboardStatCardsProps {
   summary: TodaySummary | undefined
   loading: boolean
+  /** Server mengirim X-Revenue-Hidden: omzet & laba disembunyikan, bukan Rp0. */
+  revenueHidden?: boolean
 }
 
-export default function DashboardStatCards({ summary, loading }: DashboardStatCardsProps) {
+export default function DashboardStatCards({ summary, loading, revenueHidden = false }: DashboardStatCardsProps) {
   const { can } = usePermissions()
 
   // Laba menyingkap harga modal setiap produk, jadi kartunya mengikuti izin yang
   // sama dengan laporan keuangan — kasir dan koki melihat omzet, bukan margin.
-  const showProfit = can(PERMS.REPORTS_FINANCIAL)
+  const showProfit = can(PERMS.REPORTS_FINANCIAL) && !revenueHidden
 
   return (
     <div className={'grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 ' + (showProfit ? 'xl:grid-cols-4' : '')}>
-      <StatCard
-        title={t('dashRevenueToday')}
-        value={formatCurrency(summary?.total_revenue ?? 0)}
-        icon={<TrendingUp size={20} />}
-        color="green"
-        loading={loading}
-        emphasis
-      />
+      {!revenueHidden && (
+        <StatCard
+          title={t('dashRevenueToday')}
+          value={formatCurrency(summary?.total_revenue ?? 0)}
+          icon={<TrendingUp size={20} />}
+          color="green"
+          loading={loading}
+          emphasis
+        />
+      )}
       {showProfit && (
         <StatCard
           title={t('dashProfitToday')}

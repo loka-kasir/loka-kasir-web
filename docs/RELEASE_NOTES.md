@@ -1,3 +1,39 @@
+# Release 1.12.0 — 28 November 2026
+
+Memerlukan backend **1.13.0**; sejalan dengan aplikasi **1.60.2+16002**. Juga
+menamai perubahan yang sudah ter-deploy bersama aplikasi 1.58.0 – 1.60.1.
+
+**Sudah berjalan sejak aplikasi 1.58.0 – 1.60.1** (ringkas)
+- Tanya Loka di dasbor (peluncur & panel bisa dipindah); Laporan & Produk di
+  sidebar; Pelanggan & Kasbon tampil di Mode Sederhana.
+- Koneksi Loka Kasir Accounting; laporan penjualan per outlet & tanggal.
+- Daftar akun dengan verifikasi email + WhatsApp pemilik; diskon kode mitra
+  sales Rp10.000 / 10%.
+- Kolom omzet disembunyikan untuk karyawan bila server mengirim
+  `X-Revenue-Hidden`; tombol kartu member di QR cek saldo hanya untuk gym.
+- Batal/hapus pembelian dengan alasan; kuota 5 pengguna aktif/outlet & add-on
+  slot; Kartu Member siap cetak (A4).
+
+**Perbaikan hasil audit 1.12.0**
+- **Kartu Member**: daftar memuat semua halaman API (dulu berhenti di 200
+  kartu — batch kedua tidak bisa diaktifkan maupun dicetak); lembar cetak hanya
+  berisi kartu *tersedia* (dulu ikut mencetak kartu yang sudah dipakai
+  pelanggan → kartu fisik kembar); margin cetak A4 8 mm + jarak 2 mm supaya 5
+  baris kartu muat satu lembar (dulu baris ke-5 tumpah ke lembar berikutnya);
+  baris "Buat N Kartu" tidak lagi meluap di lebar ponsel; seluruh teks modal
+  (67 string) kini mengikuti bahasa (`mcp*`).
+- **Beranda untuk karyawan dengan omzet disembunyikan**: kartu Pendapatan &
+  Laba tidak lagi tampil sebagai Rp0.
+- Menu QR publik: toast "… ditambahkan" mengikuti bahasa.
+- Teks add-on pengguna (Inggris) tidak lagi "1 months / 1 users".
+- `WhatsAppReminderCard` aman bila `localStorage` diblokir.
+- Lint `MemberCardPoolModal` (`no-useless-assignment`).
+
+**Cek**: `npx tsc -b` dan `vitest run` hijau. `npm run lint` masih menyisakan 2
+galat lama di luar rentang ini (`SalesHomePage.tsx`, `PublicQRAccess.tsx`).
+
+---
+
 # Release 1.11.0 — 19 November 2026
 
 Memerlukan backend **1.12.0**.

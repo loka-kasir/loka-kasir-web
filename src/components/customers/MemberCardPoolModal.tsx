@@ -9,7 +9,7 @@ import {
   blockMemberCard,
   createMemberCardBatch,
   formatMemberCardCode,
-  listMemberCards,
+  listAllMemberCards,
   type MemberCardPoolItem,
   unassignMemberCard,
 } from '@/api/memberCards'
@@ -19,21 +19,27 @@ import { useOutletStore } from '@/store/outletStore'
 import { usePermissions, PERMS } from '@/hooks/usePermissions'
 import { getErrorMessage } from '@/lib/utils'
 import { formatMoney } from '@/lib/money'
+import { t } from '@/lib/i18n'
+import type { MessageKey } from '@/lib/messages'
 
 type Purpose = 'general' | 'gym'
 type CodeStyle = 'both' | 'qr' | 'barcode'
 type CardTemplate = 'classic' | 'dark' | 'minimal'
 type AccentKey = 'blue' | 'emerald' | 'espresso' | 'charcoal' | 'crimson'
 
-const ACCENTS: Record<AccentKey, { hex: string; soft: string; label: string }> = {
-  blue: { hex: '#1D4ED8', soft: '#DBEAFE', label: 'Biru' },
-  emerald: { hex: '#0F766E', soft: '#CCFBF1', label: 'Hijau' },
-  espresso: { hex: '#6B3F22', soft: '#F3E5D8', label: 'Kopi' },
-  charcoal: { hex: '#111827', soft: '#E5E7EB', label: 'Hitam' },
-  crimson: { hex: '#991B1B', soft: '#FEE2E2', label: 'Marun' },
+const ACCENTS: Record<AccentKey, { hex: string; soft: string; labelKey: MessageKey }> = {
+  blue: { hex: '#1D4ED8', soft: '#DBEAFE', labelKey: 'mcpAccentBlue' },
+  emerald: { hex: '#0F766E', soft: '#CCFBF1', labelKey: 'mcpAccentGreen' },
+  espresso: { hex: '#6B3F22', soft: '#F3E5D8', labelKey: 'mcpAccentCoffee' },
+  charcoal: { hex: '#111827', soft: '#E5E7EB', labelKey: 'mcpAccentBlack' },
+  crimson: { hex: '#991B1B', soft: '#FEE2E2', labelKey: 'mcpAccentMaroon' },
 }
 
 const POWERED_BY = 'powered by lokakasir.id'
+
+function defaultTagline(purpose: Purpose): string {
+  return purpose === 'gym' ? t('mcpTaglineGym') : t('mcpTaglineGeneral')
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -79,12 +85,10 @@ async function openPrintableCardSheet(opts: {
   const acc = ACCENTS[opts.accent]
   const isDark = template === 'dark'
   const isMinimal = template === 'minimal'
-  const title = purpose === 'gym' ? 'KARTU MEMBER GYM' : 'KARTU MEMBER'
+  const title = purpose === 'gym' ? t('mcpCardTitleGym') : t('mcpCardTitle')
   const tagline =
     opts.tagline?.trim() ||
-    (purpose === 'gym'
-      ? 'Scan saat check-in, transaksi & cek keanggotaan'
-      : 'Scan di kasir untuk transaksi, top up & cek saldo')
+    defaultTagline(purpose)
   const storeName = businessName.trim() || 'Loka Kasir'
   const initials = storeInitials(storeName)
 
@@ -105,7 +109,7 @@ async function openPrintableCardSheet(opts: {
           ? renderBarcodeSvg(card.qr_payload)
           : ''
       const codeText = formatMemberCardCode(card.card_code)
-      let bodyHtml = ''
+      let bodyHtml: string
       if (codeStyle === 'both') {
         bodyHtml = `
           <div class="body-row">
@@ -121,7 +125,7 @@ async function openPrintableCardSheet(opts: {
           <div class="body-row">
             <div class="qr-box qr-lg"><img src="${qr}" alt="" /></div>
             <div class="bar-col left">
-              <div class="code-label">KODE KARTU</div>
+              <div class="code-label">${escapeHtml(t('mcpCodeLabel'))}</div>
               <div class="code-text lg">${escapeHtml(codeText)}</div>
               <div class="tagline left">${escapeHtml(tagline)}</div>
             </div>
@@ -160,19 +164,20 @@ async function openPrintableCardSheet(opts: {
 
   const win = window.open('', '_blank', 'width=960,height=720')
   if (!win) {
-    toast.error('Pop-up diblokir browser. Izinkan pop-up untuk mencetak PDF kartu.')
+    toast.error(t('mcpPopupBlocked'))
     return
   }
   win.document.write(`<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Kartu Member (${cards.length})</title>
+  <title>${escapeHtml(t('mcpSheetTitle', { count: cards.length }))}</title>
   <style>
-    @page { size: A4 portrait; margin: 11mm 14mm; }
+    /* A4 297mm: 5×54mm + 4×2mm + 2×8mm = 294mm. Dulu 11mm + 3,5mm = 306mm → baris ke-5 tumpah ke lembar berikutnya. */
+    @page { size: A4 portrait; margin: 8mm 14mm; }
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { margin: 0; background: #fff; color: #111827; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page { display: grid; grid-template-columns: repeat(2, 85.6mm); grid-auto-rows: 54mm; column-gap: 10mm; row-gap: 3.5mm; page-break-after: always; justify-content: space-between; }
+    .page { display: grid; grid-template-columns: repeat(2, 85.6mm); grid-auto-rows: 54mm; column-gap: 10mm; row-gap: 2mm; page-break-after: always; justify-content: space-between; }
     .page:last-child { page-break-after: auto; }
     .card { width: 85.6mm; height: 54mm; border: 0.7pt solid ${isDark ? '#334155' : '#cbd5e1'}; background: ${isDark ? '#0f172a' : '#ffffff'}; border-radius: 3mm; overflow: hidden; display: flex; flex-direction: column; }
     .card-head { padding: 2.2mm 3.2mm; display: flex; align-items: center; gap: 2.4mm; background: ${isMinimal ? '#ffffff' : isDark ? '#1e293b' : acc.hex}; ${isMinimal ? `border-top: 1.2mm solid ${acc.hex}; border-bottom: 0.5pt solid #e2e8f0;` : isDark ? `border-bottom: 0.6mm solid ${acc.hex};` : ''} }
@@ -258,7 +263,7 @@ export default function MemberCardPoolModal({
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['member-cards', status, search],
-    queryFn: () => listMemberCards({ status: status || undefined, search: search || undefined, limit: 200 }),
+    queryFn: () => listAllMemberCards({ status: status || undefined, search: search || undefined }),
     enabled: open,
   })
 
@@ -270,7 +275,7 @@ export default function MemberCardPoolModal({
     mutationFn: () => createMemberCardBatch({ count: parsedBatchCount, batch_label: batchLabel || undefined }),
     onSuccess: (res) => {
       const created = res.data?.data?.items ?? []
-      toast.success(`${created.length} kartu member berhasil dibuat!`)
+      toast.success(t('mcpCreatedToast', { count: created.length }))
       setBatchLabel('')
       qc.invalidateQueries({ queryKey: ['member-cards'] })
     },
@@ -279,7 +284,7 @@ export default function MemberCardPoolModal({
 
   const assignMut = useMutation({
     mutationFn: () => {
-      if (!assignCard) throw new Error('Kartu belum dipilih')
+      if (!assignCard) throw new Error(t('mcpNoCardSelected'))
       return assignMemberCard(assignCard.id, {
         create_customer: true,
         name: newName.trim(),
@@ -288,7 +293,7 @@ export default function MemberCardPoolModal({
       })
     },
     onSuccess: () => {
-      toast.success(`Kartu ${assignCard?.serial_label} berhasil diaktifkan!`)
+      toast.success(t('mcpActivatedToast', { serial: assignCard?.serial_label ?? '' }))
       setAssignCard(null)
       setNewName('')
       setNewPhone('')
@@ -302,7 +307,7 @@ export default function MemberCardPoolModal({
   const unassignMut = useMutation({
     mutationFn: (id: string) => unassignMemberCard(id),
     onSuccess: () => {
-      toast.success('Kartu dilepas dan kembali tersedia.')
+      toast.success(t('mcpUnassignedToast'))
       qc.invalidateQueries({ queryKey: ['member-cards'] })
     },
     onError: (err) => toast.error(getErrorMessage(err)),
@@ -311,7 +316,7 @@ export default function MemberCardPoolModal({
   const blockMut = useMutation({
     mutationFn: (id: string) => blockMemberCard(id, 'Diblokir dari dashboard'),
     onSuccess: () => {
-      toast.success('Kartu diblokir.')
+      toast.success(t('mcpBlockedToast'))
       qc.invalidateQueries({ queryKey: ['member-cards'] })
     },
     onError: (err) => toast.error(getErrorMessage(err)),
@@ -319,15 +324,15 @@ export default function MemberCardPoolModal({
 
   if (!open) return null
 
-  const printableCards = items.filter((c) => c.status !== 'blocked')
+  // Hanya kartu yang belum dipakai: mencetak ulang kartu yang sudah tertaut
+  // ke pelanggan menghasilkan kartu fisik kembar dengan kode yang sama.
+  const printableCards = items.filter((c) => c.status === 'available')
   const acc = ACCENTS[accent]
   const isDark = template === 'dark'
   const isMinimal = template === 'minimal'
   const previewTagline =
     customTagline.trim() ||
-    (purpose === 'gym'
-      ? 'Scan saat check-in, transaksi & cek keanggotaan'
-      : 'Scan di kasir untuk transaksi, top up & cek saldo')
+    defaultTagline(purpose)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-6">
@@ -340,10 +345,10 @@ export default function MemberCardPoolModal({
             </div>
             <div className="min-w-0">
               <h2 className="text-base font-bold text-foreground truncate">
-                Kartu Member Siap Cetak (Barcode Permanen)
+                {t('mcpTitle')}
               </h2>
               <p className="text-xs text-muted-foreground">
-                Buat kartu member sesuai jumlah kebutuhan (1–200 per batch), pilih template &amp; logo toko, lalu cetak A4 siap potong.
+                {t('mcpSubtitle')}
               </p>
             </div>
           </div>
@@ -357,15 +362,15 @@ export default function MemberCardPoolModal({
           {/* Summary */}
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-xl border border-border p-3">
-              <p className="text-xs text-muted-foreground">Tersedia (Kosong)</p>
+              <p className="text-xs text-muted-foreground">{t('mcpSummaryAvailable')}</p>
               <p className="text-xl font-bold text-blue-600">{summary?.available ?? 0}</p>
             </div>
             <div className="rounded-xl border border-border p-3">
-              <p className="text-xs text-muted-foreground">Terpakai (Aktif)</p>
+              <p className="text-xs text-muted-foreground">{t('mcpSummaryAssigned')}</p>
               <p className="text-xl font-bold text-emerald-600">{summary?.assigned ?? 0}</p>
             </div>
             <div className="rounded-xl border border-border p-3">
-              <p className="text-xs text-muted-foreground">Diblokir</p>
+              <p className="text-xs text-muted-foreground">{t('mcpStatusBlocked')}</p>
               <p className="text-xl font-bold text-rose-600">{summary?.blocked ?? 0}</p>
             </div>
           </div>
@@ -374,9 +379,9 @@ export default function MemberCardPoolModal({
           <div className="grid lg:grid-cols-2 gap-4">
             {can(PERMS.CUSTOMER_MANAGE) && (
               <div className="rounded-xl border border-border p-4 space-y-3 bg-muted/20">
-                <p className="text-xs font-semibold text-foreground">Buat Batch Kartu Baru</p>
+                <p className="text-xs font-semibold text-foreground">{t('mcpNewBatch')}</p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-xs text-muted-foreground shrink-0">Jumlah:</label>
+                  <label className="text-xs text-muted-foreground shrink-0">{t('mcpCountLabel')}</label>
                   <input
                     type="number"
                     min={1}
@@ -401,27 +406,29 @@ export default function MemberCardPoolModal({
                     </button>
                   ))}
                 </div>
-                <div className="flex gap-2">
+                {/* min-w-0 + flex-wrap: di lebar ponsel kolom label dulu meluapkan
+                    tombol "Buat N Kartu" keluar tepi modal. */}
+                <div className="flex flex-wrap gap-2">
                   <input
                     type="text"
-                    placeholder="Label batch (opsional, mis. Batch 1)"
+                    placeholder={t('mcpBatchLabelPlaceholder')}
                     value={batchLabel}
                     onChange={(e) => setBatchLabel(e.target.value)}
-                    className="flex-1 px-3 py-1.5 text-xs border border-border rounded-lg bg-card"
+                    className="flex-1 min-w-0 basis-40 px-3 py-1.5 text-xs border border-border rounded-lg bg-card"
                   />
                   <button
                     type="button"
                     disabled={!batchCountValid || createBatchMut.isPending}
                     onClick={() => createBatchMut.mutate()}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
                   >
-                    <Plus size={14} /> {batchCountValid ? `Buat ${parsedBatchCount} Kartu` : 'Buat Kartu'}
+                    <Plus size={14} /> {batchCountValid ? t('mcpCreateN', { count: parsedBatchCount }) : t('mcpCreate')}
                   </button>
                 </div>
 
                 {/* Live CR80 Card Preview */}
                 <div className="pt-1">
-                  <p className="text-[11px] font-medium text-muted-foreground mb-1.5">Pratinjau Kartu (CR80)</p>
+                  <p className="text-[11px] font-medium text-muted-foreground mb-1.5">{t('mcpPreview')}</p>
                   <div
                     className="mx-auto max-w-[310px] aspect-[85.6/54] rounded-xl overflow-hidden flex flex-col shadow-sm border"
                     style={{
@@ -468,7 +475,7 @@ export default function MemberCardPoolModal({
                           className="text-[8px] font-bold tracking-wider"
                           style={{ color: isMinimal ? acc.hex : isDark ? acc.soft : '#E2E8F0' }}
                         >
-                          {purpose === 'gym' ? 'KARTU MEMBER GYM' : 'KARTU MEMBER'}
+                          {purpose === 'gym' ? t('mcpCardTitleGym') : t('mcpCardTitle')}
                         </p>
                       </div>
                       <span
@@ -522,12 +529,12 @@ export default function MemberCardPoolModal({
             )}
 
             <div className="rounded-xl border border-border p-4 space-y-2.5 bg-muted/20">
-              <p className="text-xs font-semibold text-foreground">Desain Template &amp; Cetak A4 (10 kartu/lembar)</p>
+              <p className="text-xs font-semibold text-foreground">{t('mcpDesignTitle')}</p>
               <div className="flex flex-wrap gap-1.5">
                 {([
-                  ['classic', 'Klasik'],
-                  ['dark', 'Elegan Gelap'],
-                  ['minimal', 'Minimalis (Hemat Tinta)'],
+                  ['classic', t('mcpTemplateClassic')],
+                  ['dark', t('mcpTemplateDark')],
+                  ['minimal', t('mcpTemplateMinimal')],
                 ] as const).map(([key, label]) => (
                   <button
                     key={key}
@@ -554,7 +561,7 @@ export default function MemberCardPoolModal({
                     }`}
                   >
                     <span className="w-3 h-3 rounded-full" style={{ background: ACCENTS[key].hex }} />
-                    {ACCENTS[key].label}
+                    {t(ACCENTS[key].labelKey)}
                   </button>
                 ))}
               </div>
@@ -564,17 +571,17 @@ export default function MemberCardPoolModal({
                   onChange={(e) => setPurpose(e.target.value as Purpose)}
                   className="px-2.5 py-1.5 text-xs border border-border rounded-lg bg-card"
                 >
-                  <option value="general">Peruntukan: Umum / Coffeeshop / Ritel</option>
-                  <option value="gym">Peruntukan: Gym / Fitness</option>
+                  <option value="general">{t('mcpPurposeGeneral')}</option>
+                  <option value="gym">{t('mcpPurposeGym')}</option>
                 </select>
                 <select
                   value={codeStyle}
                   onChange={(e) => setCodeStyle(e.target.value as CodeStyle)}
                   className="px-2.5 py-1.5 text-xs border border-border rounded-lg bg-card"
                 >
-                  <option value="both">Format: QR + Barcode 1D</option>
-                  <option value="qr">Format: QR Saja</option>
-                  <option value="barcode">Format: Barcode 1D Saja</option>
+                  <option value="both">{t('mcpFormatBoth')}</option>
+                  <option value="qr">{t('mcpFormatQr')}</option>
+                  <option value="barcode">{t('mcpFormatBarcode')}</option>
                 </select>
               </div>
               <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
@@ -585,19 +592,19 @@ export default function MemberCardPoolModal({
                   className="rounded border-border"
                 />
                 <span>
-                  Tampilkan logo toko {logoUrl ? '(dari profil toko)' : '(inisial toko bila logo belum diunggah)'}
+                  {t('mcpShowLogo')} {logoUrl ? t('mcpLogoFromProfile') : t('mcpLogoInitials')}
                 </span>
               </label>
               <input
                 type="text"
-                placeholder="Info kaki kartu (opsional, mis. @kopisenja · Jl. Sudirman)"
+                placeholder={t('mcpFooterPlaceholder')}
                 value={storeInfo}
                 onChange={(e) => setStoreInfoOverride(e.target.value)}
                 className="w-full px-3 py-1.5 text-xs border border-border rounded-lg bg-card"
               />
               <input
                 type="text"
-                placeholder="Teks keterangan kartu (opsional)"
+                placeholder={t('mcpTaglinePlaceholder')}
                 value={customTagline}
                 onChange={(e) => setCustomTagline(e.target.value)}
                 className="w-full px-3 py-1.5 text-xs border border-border rounded-lg bg-card"
@@ -621,7 +628,7 @@ export default function MemberCardPoolModal({
                 }
                 className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50"
               >
-                <Printer size={14} /> Cetak / Simpan PDF ({printableCards.length} kartu)
+                <Printer size={14} /> {t('mcpPrintButton', { count: printableCards.length })}
               </button>
             </div>
           </div>
@@ -634,15 +641,15 @@ export default function MemberCardPoolModal({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Cari #001, kode kartu, nama / HP member..."
+                placeholder={t('mcpSearchPlaceholder')}
                 className="w-full pl-8 pr-3 py-1.5 text-sm border border-border rounded-xl bg-card"
               />
             </div>
             {[
-              ['', 'Semua'],
-              ['available', 'Tersedia'],
-              ['assigned', 'Terpakai'],
-              ['blocked', 'Diblokir'],
+              ['', t('mcpStatusAll')],
+              ['available', t('mcpStatusAvailable')],
+              ['assigned', t('mcpStatusAssigned')],
+              ['blocked', t('mcpStatusBlocked')],
             ].map(([val, label]) => (
               <button
                 key={val}
@@ -662,7 +669,7 @@ export default function MemberCardPoolModal({
               onClick={() => refetch()}
               className="px-3 py-1.5 text-xs border border-border rounded-xl text-muted-foreground hover:bg-muted"
             >
-              Segarkan
+              {t('mcpRefresh')}
             </button>
           </div>
 
@@ -671,7 +678,7 @@ export default function MemberCardPoolModal({
             <div className="rounded-xl border border-blue-300 bg-blue-50/60 dark:bg-blue-500/10 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-bold text-foreground">
-                  Aktifkan Kartu {assignCard.serial_label} ({formatMemberCardCode(assignCard.card_code)}) untuk Member Baru
+                  {t('mcpAssignTitle', { serial: assignCard.serial_label, code: formatMemberCardCode(assignCard.card_code) })}
                 </p>
                 <button onClick={() => setAssignCard(null)} className="text-muted-foreground hover:text-foreground">
                   <X size={16} />
@@ -680,21 +687,21 @@ export default function MemberCardPoolModal({
               <div className="grid sm:grid-cols-3 gap-2">
                 <input
                   type="text"
-                  placeholder="Nama member *"
+                  placeholder={t('mcpNamePlaceholder')}
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="px-3 py-2 text-sm border border-border rounded-xl bg-card"
                 />
                 <input
                   type="text"
-                  placeholder="Nomor HP / WhatsApp"
+                  placeholder={t('mcpPhonePlaceholder')}
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value)}
                   className="px-3 py-2 text-sm border border-border rounded-xl bg-card"
                 />
                 <input
                   type="text"
-                  placeholder="Catatan (opsional)"
+                  placeholder={t('mcpNotesPlaceholder')}
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
                   className="px-3 py-2 text-sm border border-border rounded-xl bg-card"
@@ -706,7 +713,7 @@ export default function MemberCardPoolModal({
                   onClick={() => setAssignCard(null)}
                   className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-border"
                 >
-                  Batal
+                  {t('mcpCancel')}
                 </button>
                 <button
                   type="button"
@@ -714,7 +721,7 @@ export default function MemberCardPoolModal({
                   onClick={() => assignMut.mutate()}
                   className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  Simpan &amp; Aktifkan
+                  {t('mcpSaveActivate')}
                 </button>
               </div>
             </div>
@@ -722,10 +729,10 @@ export default function MemberCardPoolModal({
 
           {/* List */}
           {isLoading ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">Memuat kartu member...</p>
+            <p className="text-sm text-muted-foreground py-8 text-center">{t('mcpLoading')}</p>
           ) : items.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">
-              Belum ada kartu member. Masukkan jumlah kartu lalu klik &ldquo;Buat Kartu&rdquo; di atas untuk membuat batch kartu siap cetak.
+              {t('mcpEmpty')}
             </p>
           ) : (
             <div className="border border-border rounded-xl overflow-hidden divide-y divide-border">
@@ -738,13 +745,18 @@ export default function MemberCardPoolModal({
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">
                         {card.status === 'assigned'
-                          ? card.customer_name || 'Member'
+                          ? card.customer_name || t('mcpMemberFallback')
                           : formatMemberCardCode(card.card_code)}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {card.status === 'assigned'
-                          ? `${formatMemberCardCode(card.card_code)} · ${card.customer_phone || 'Tanpa HP'} · Saldo ${formatMoney(card.deposit_balance ?? 0)} · ${card.points_balance ?? 0} pts`
-                          : card.batch_label || 'Siap dipakai'}
+                          ? t('mcpAssignedLine', {
+                              code: formatMemberCardCode(card.card_code),
+                              phone: card.customer_phone || t('mcpNoPhone'),
+                              balance: formatMoney(card.deposit_balance ?? 0),
+                              points: card.points_balance ?? 0,
+                            })
+                          : card.batch_label || t('mcpReadyToUse')}
                       </p>
                     </div>
                   </div>
@@ -759,19 +771,19 @@ export default function MemberCardPoolModal({
                       }`}
                     >
                       {card.status === 'assigned'
-                        ? 'Terpakai'
+                        ? t('mcpStatusAssigned')
                         : card.status === 'blocked'
-                          ? 'Diblokir'
-                          : 'Tersedia'}
+                          ? t('mcpStatusBlocked')
+                          : t('mcpStatusAvailable')}
                     </span>
                     {card.status === 'available' && (
                       <button
                         type="button"
                         onClick={() => setAssignCard(card)}
-                        title="Aktifkan untuk member baru"
+                        title={t('mcpRegisterTitle')}
                         className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50"
                       >
-                        <UserPlus size={13} /> Daftar
+                        <UserPlus size={13} /> {t('mcpRegister')}
                       </button>
                     )}
                     {card.status === 'assigned' && can(PERMS.CUSTOMER_MANAGE) && (
@@ -779,11 +791,11 @@ export default function MemberCardPoolModal({
                         <button
                           type="button"
                           onClick={() => {
-                            if (confirm(`Lepas kartu ${card.serial_label} agar kembali tersedia?`)) {
+                            if (confirm(t('mcpUnassignConfirm', { serial: card.serial_label }))) {
                               unassignMut.mutate(card.id)
                             }
                           }}
-                          title="Lepas kartu"
+                          title={t('mcpUnassignTitle')}
                           className="p-1.5 text-muted-foreground hover:text-amber-600 rounded-lg hover:bg-amber-50"
                         >
                           <Unlink size={14} />
@@ -791,11 +803,11 @@ export default function MemberCardPoolModal({
                         <button
                           type="button"
                           onClick={() => {
-                            if (confirm(`Blokir permanen kartu ${card.serial_label}?`)) {
+                            if (confirm(t('mcpBlockConfirm', { serial: card.serial_label }))) {
                               blockMut.mutate(card.id)
                             }
                           }}
-                          title="Blokir kartu"
+                          title={t('mcpBlockTitle')}
                           className="p-1.5 text-muted-foreground hover:text-rose-600 rounded-lg hover:bg-rose-50"
                         >
                           <Ban size={14} />

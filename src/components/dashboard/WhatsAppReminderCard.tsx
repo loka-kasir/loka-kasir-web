@@ -18,8 +18,14 @@ const SNOOZE_DAYS = 3
 export default function WhatsAppReminderCard() {
   const owner = useAuthStore((s) => s.user?.role?.code === 'OWNER')
   const [hidden, setHidden] = useState(() => {
-    const until = Number.parseInt(localStorage.getItem(SNOOZE_KEY) ?? '', 10)
-    return Date.now() < until
+    // Penyimpanan bisa diblokir (mode privat/peramban ketat): baca gagal =
+    // pengingat tetap tampil, bukan dasbor yang ikut gagal dirender.
+    try {
+      const until = Number.parseInt(localStorage.getItem(SNOOZE_KEY) ?? '', 10)
+      return Date.now() < until
+    } catch {
+      return false
+    }
   })
   // Kunci kueri sama dengan halaman Profil: mengisi nomornya di sana langsung
   // menghilangkan pengingat ini.
@@ -28,7 +34,11 @@ export default function WhatsAppReminderCard() {
   if (!owner || hidden || !profile || profile.whatsapp_number) return null
 
   const snooze = () => {
-    localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_DAYS * 24 * 60 * 60 * 1000))
+    try {
+      localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_DAYS * 24 * 60 * 60 * 1000))
+    } catch {
+      // Tidak bisa diingat; tetap disembunyikan untuk sesi ini.
+    }
     setHidden(true)
   }
 
