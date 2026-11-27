@@ -39,6 +39,7 @@ import PoCostPreview from '@/components/stock/PoCostPreview'
 import SearchableSelect from '@/components/ui/SearchableSelect'
 import { useOutletStore } from '@/store/outletStore'
 import POPaymentSection from '@/components/purchasing/POPaymentSection'
+import VoidReasonModal from '@/components/finance/VoidReasonModal'
 import { PAYMENT_METHOD_LABEL, PAYMENT_STATUS_VARIANT, canPay, paymentStatusLabel } from '@/lib/purchasePayables'
 import { parseNumericInput, validNumericInput, convertMaterialQuantity } from '@/lib/materialUnits'
 import {
@@ -711,13 +712,19 @@ function ViewPOModal({
   open,
   onClose,
   onMutated,
+  onCancel,
+  onDelete,
 }: {
   poId: string | null
   open: boolean
   onClose: () => void
   onMutated: () => void
+  onCancel?: (po: PurchaseOrder) => void
+  onDelete?: (po: PurchaseOrder) => void
 }) {
   const qc = useQueryClient()
+  const { can } = usePermissions()
+  const canWrite = can(PERMS.INVENTORY_PURCHASE_ORDER)
   const [showReceive, setShowReceive] = useState(false)
   const [receiveQtys, setReceiveQtys] = useState<Record<string, string>>({})
   const [receiveCosts, setReceiveCosts] = useState<Record<string, string>>({})
@@ -940,15 +947,37 @@ function ViewPOModal({
               belum menerima apa pun tidak punya apa-apa untuk dibayar. */}
           {(po.status !== 'cancelled' || (po.received_amount ?? 0) > 0) && <POPaymentSection po={po} />}
 
-          {/* Receive section */}
-          {canReceive && !showReceive && (
-            <div className="flex justify-end">
-              <button
-                onClick={() => initReceive(po.items)}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700"
-              >
-                {t('poReceiveGoods')}
-              </button>
+          {/* Receive & cancel/delete actions */}
+          {!showReceive && (canReceive || (canWrite && (onCancel || onDelete))) && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border">
+              <div className="flex flex-wrap items-center gap-2">
+                {canWrite && onCancel && po.status !== 'cancelled' && (
+                  <button
+                    type="button"
+                    onClick={() => onCancel(po)}
+                    className="px-3 py-2 text-sm font-medium text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                  >
+                    {t('actionCancelOrder')}
+                  </button>
+                )}
+                {canWrite && onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(po)}
+                    className="px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30"
+                  >
+                    {t('actionDelete')}
+                  </button>
+                )}
+              </div>
+              {canReceive && (
+                <button
+                  onClick={() => initReceive(po.items)}
+                  className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700"
+                >
+                  {t('poReceiveGoods')}
+                </button>
+              )}
             </div>
           )}
 
@@ -1059,8 +1088,10 @@ export default function PurchaseOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [viewPoId, setViewPoId] = useState<string | null>(null)
+  const [voidAction, setVoidAction] = useState<{ kind: 'cancel' | 'delete'; po: PurchaseOrder } | null>(null)
   const [draftSuggestions, setDraftSuggestions] = useState<RestockSuggestion[]>([])
   const [draftSupplierId, setDraftSupplierId] = useState('')
+  const canWrite = can(PERMS.INVENTORY_PURCHASE_ORDER)
   // Saklar "Pakai Purchase Order" mati: halaman yang sama menjadi "Pembelian"
   // — tombol tambah membuka Pembelian langsung, tab status disembunyikan
   // (semua pembelian sudah diterima). PO lama tetap tampil di daftar.
@@ -1105,23 +1136,60 @@ export default function PurchaseOrdersPage() {
     setCreateOpen(true)
   }
 
+  function invalidatePurchaseCaches(id: string) {
+    qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+    qc.invalidateQueries({ queryKey: ['purchase-order', id] })
+    qc.invalidateQueries({ queryKey: ['purchase-order-payments', id] })
+    qc.invalidateQueries({ queryKey: ['purchase-order-restock-suggestions'] })
+    for (const key of ['purchase-report', 'supplier-payables', 'cash-accounts', 'cash-ledger']) {
+      qc.invalidateQueries({ queryKey: [key] })
+    }
+    qc.invalidateQueries({ predicate: (q) => {
+      const key = String(q.queryKey[0])
+      return key.startsWith('raw-material') || key.startsWith('outlet-stock') || key.startsWith('product')
+    } })
+  }
+
   const cancelMut = useMutation({
-    mutationFn: (id: string) => cancelPurchaseOrder(id),
-    onSuccess: () => {
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) => cancelPurchaseOrder(id, reason),
+    onSuccess: (_res, vars) => {
       toast.success(t('poCancelled'))
-      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+      setVoidAction(null)
+      invalidatePurchaseCaches(vars.id)
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
   const deleteMut = useMutation({
-    mutationFn: (id: string) => deletePurchaseOrder(id),
-    onSuccess: () => {
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) => deletePurchaseOrder(id, reason),
+    onSuccess: (_res, vars) => {
       toast.success(t('poDeleted'))
-      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+      setVoidAction(null)
+      if (viewPoId === vars.id) setViewPoId(null)
+      invalidatePurchaseCaches(vars.id)
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
+
+  function requestCancel(po: PurchaseOrder) {
+    if (po.status === 'received' || po.status === 'partial_received') {
+      setVoidAction({ kind: 'cancel', po })
+      return
+    }
+    if (confirm(`Batalkan PO "${po.po_number}"?`)) {
+      cancelMut.mutate({ id: po.id })
+    }
+  }
+
+  function requestDelete(po: PurchaseOrder) {
+    if (po.status === 'received' || po.status === 'partial_received') {
+      setVoidAction({ kind: 'delete', po })
+      return
+    }
+    if (confirm(t('confirmDeleteNamed', { name: po.po_number }))) {
+      deleteMut.mutate({ id: po.id })
+    }
+  }
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
@@ -1251,8 +1319,8 @@ export default function PurchaseOrdersPage() {
                     </td>
                     <td data-label={t('labelStatus')} className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-1">
-                        {/* Pembelian langsung selalu "Diterima" — yang berarti status bayarnya. */}
-                        {!po.is_direct && <StatusBadge status={po.status} />}
+                        {/* Pembelian langsung selalu "Diterima" — tampilkan status hanya bila dibatalkan; selain itu status bayarnya. */}
+                        {(!po.is_direct || po.status === 'cancelled') && <StatusBadge status={po.status} />}
                         {/* Status bayar hanya bila sudah ada tagihan (barang diterima). */}
                         {po.payment_status && po.payment_status !== 'none' && (
                           <Badge variant={PAYMENT_STATUS_VARIANT[po.payment_status]}
@@ -1265,12 +1333,11 @@ export default function PurchaseOrdersPage() {
                     <td data-label={t('labelActions')} className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <ActionButton variant="edit" onClick={() => setViewPoId(po.id)}>{t('actionView')}</ActionButton>
-                        {(po.status === 'draft' || po.status === 'ordered') && (
-                          <ActionButton onClick={() => { if (confirm(`Batalkan PO "${po.po_number}"?`)) cancelMut.mutate(po.id) }}>{t('actionCancelOrder')}</ActionButton>
+                        {canWrite && po.status !== 'cancelled' && (
+                          <ActionButton onClick={() => requestCancel(po)}>{t('actionCancelOrder')}</ActionButton>
                         )}
-                        {/* Boleh dihapus selama belum ada barang diterima — sama dengan aturan server. */}
-                        {(po.status === 'draft' || po.status === 'ordered' || po.status === 'cancelled') && (
-                          <DeleteButton onClick={() => { if (confirm(t('confirmDeleteNamed', { name: po.po_number }))) deleteMut.mutate(po.id) }} />
+                        {canWrite && (
+                          <DeleteButton onClick={() => requestDelete(po)} />
                         )}
                       </div>
                     </td>
@@ -1312,7 +1379,34 @@ export default function PurchaseOrdersPage() {
         open={!!viewPoId}
         onClose={() => setViewPoId(null)}
         onMutated={() => qc.invalidateQueries({ queryKey: ['purchase-orders'] })}
+        onCancel={requestCancel}
+        onDelete={requestDelete}
       />
+
+      {/* Cancel / Delete received purchase modal (with reason) */}
+      {voidAction && (
+        <VoidReasonModal
+          open
+          onClose={() => setVoidAction(null)}
+          onConfirm={(reason) => {
+            if (voidAction.kind === 'cancel') {
+              cancelMut.mutate({ id: voidAction.po.id, reason })
+            } else {
+              deleteMut.mutate({ id: voidAction.po.id, reason })
+            }
+          }}
+          pending={cancelMut.isPending || deleteMut.isPending}
+          title={voidAction.kind === 'delete' ? t('poDeleteTitle') : t('poCancelTitle')}
+          confirmLabel={voidAction.kind === 'delete' ? t('actionDelete') : t('actionCancelOrder')}
+          hint={voidAction.kind === 'delete' ? t('poDeleteReceivedHint') : t('poCancelReceivedHint')}
+          summary={(
+            <p className="font-medium text-foreground">
+              {voidAction.po.po_number} · {formatCurrency(voidAction.po.total_amount)}
+              {voidAction.po.supplier?.name ? ` · ${voidAction.po.supplier.name}` : ''}
+            </p>
+          )}
+        />
+      )}
     </div>
   )
 }

@@ -52,7 +52,8 @@ function login(purchaseOrders?: boolean) {
   useAuthStore.setState({
     token: 'x',
     user: { id: 'u', role: { code: 'OWNER', name: 'Owner' }, permissions: [],
-      business: { business_name: 'Toko Uji', owner_name: 'Uji', purchase_orders_enabled: purchaseOrders } } as never,
+      business: { business_name: 'Toko Uji', owner_name: 'Uji', purchase_orders_enabled: purchaseOrders,
+        membership: { status: 'ACTIVE', tier: 'pro', is_active: true, end_date: '2099-12-31T00:00:00Z' } } } as never,
   })
 }
 
@@ -115,5 +116,48 @@ describe('Pakai Purchase Order', () => {
     useAuthStore.setState({ token: 'x', user: { id: 'u', role: { code: 'MANAGER', name: 'Manajer' }, permissions: [], business: {} } as never })
     await render(<PurchaseOrdersToggle />)
     expect(document.querySelector('button[role="switch"]')).toBeNull()
+  })
+
+  it('pembelian langsung yang sudah diterima punya tombol Batalkan dan Hapus dengan modal alasan', async () => {
+    login(false)
+    await render(<PurchaseOrdersPage />)
+    const directRow = Array.from(document.querySelectorAll('tr')).find(tr => tr.textContent?.includes('PB-20261030-001'))!
+    const rowButtons = Array.from(directRow.querySelectorAll('button'))
+    const cancelBtn = rowButtons.find(b => b.textContent?.includes(t('actionCancelOrder')))
+    const deleteBtn = rowButtons.find(b => b.textContent?.includes(t('actionDelete')) || b.getAttribute('aria-label')?.includes(t('actionDelete')))
+    expect(cancelBtn).toBeTruthy()
+    expect(deleteBtn).toBeTruthy()
+
+    // Uji Batalkan: buka modal alasan, isi alasan, kirim PATCH /cancel
+    await act(async () => { cancelBtn!.click() })
+    await act(async () => { await new Promise(r => setTimeout(r, 20)) })
+    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    expect(textarea).toBeTruthy()
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, 'Salah input jumlah')
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const submitBtn = Array.from(document.querySelectorAll('button[type="submit"]')).pop() as HTMLButtonElement
+    await act(async () => { submitBtn.click() })
+    await act(async () => { await new Promise(r => setTimeout(r, 30)) })
+    expect(calls).toContainEqual({ method: 'patch', url: '/purchase-order/po1/cancel', body: { reason: 'Salah input jumlah' } })
+
+    // Uji Hapus: ambil ulang tombol setelah refetch, buka modal alasan, kirim DELETE dengan body reason
+    const freshRow = Array.from(document.querySelectorAll('tr')).find(tr => tr.textContent?.includes('PB-20261030-001'))!
+    const freshDeleteBtn = Array.from(freshRow.querySelectorAll('button')).find(b => b.textContent?.includes(t('actionDelete')) || b.getAttribute('aria-label')?.includes(t('actionDelete')))!
+    await act(async () => { freshDeleteBtn.click() })
+    await act(async () => { await new Promise(r => setTimeout(r, 20)) })
+    const textarea2 = document.querySelector('textarea') as HTMLTextAreaElement
+    expect(textarea2).toBeTruthy()
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea2, 'Transaksi duplikat')
+      textarea2.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const submitBtn2 = Array.from(document.querySelectorAll('button[type="submit"]')).pop() as HTMLButtonElement
+    await act(async () => { submitBtn2.click() })
+    await act(async () => { await new Promise(r => setTimeout(r, 30)) })
+    expect(calls).toContainEqual({ method: 'delete', url: '/purchase-order/po1', body: { data: { reason: 'Transaksi duplikat' } } })
   })
 })

@@ -136,8 +136,8 @@ export const createDirectPurchase = (data: DirectPurchasePayload, idempotencyKey
 export const receivePurchaseOrder = (id: string, data: ReceivePOPayload) =>
   api.post<ApiResponse<PurchaseOrder>>(`/purchase-order/${id}/receive`, data)
 
-export const cancelPurchaseOrder = (id: string) =>
-  api.patch<ApiResponse<PurchaseOrder>>(`/purchase-order/${id}/cancel`)
+export const cancelPurchaseOrder = (id: string, reason?: string) =>
+  api.patch<ApiResponse<PurchaseOrder>>(`/purchase-order/${id}/cancel`, reason ? { reason } : undefined)
 
-export const deletePurchaseOrder = (id: string) =>
-  api.delete<ApiResponse<null>>(`/purchase-order/${id}`)
+export const deletePurchaseOrder = (id: string, reason?: string) =>
+  api.delete<ApiResponse<null>>(`/purchase-order/${id}`, reason ? { data: { reason } } : undefined)

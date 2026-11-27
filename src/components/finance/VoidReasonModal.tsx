@@ -13,6 +13,10 @@ interface VoidReasonModalProps {
   summary?: ReactNode
   /** Penjelasan akibatnya (saldo/total dihitung ulang, sisi lawan ikut batal). */
   hint: string
+  /** Judul modal (bawaan: cashAccVoidTitle). */
+  title?: string
+  /** Label tombol konfirmasi (bawaan: cashAccVoidConfirm). */
+  confirmLabel?: string
 }
 
 /**
@@ -20,7 +24,7 @@ interface VoidReasonModalProps {
  * kas masuk/keluar shift. Catatan tidak pernah dihapus; alasannya yang
  * menjelaskan baris yang dicoret di kemudian hari.
  */
-export default function VoidReasonModal({ open, onClose, onConfirm, pending, summary, hint }: VoidReasonModalProps) {
+export default function VoidReasonModal({ open, onClose, onConfirm, pending, summary, hint, title, confirmLabel }: VoidReasonModalProps) {
   const [reason, setReason] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const invalid = !isValidVoidReason(reason)
@@ -31,7 +35,7 @@ export default function VoidReasonModal({ open, onClose, onConfirm, pending, sum
     onClose()
   }
   return (
-    <Modal open={open} onClose={close} title={t('cashAccVoidTitle')} size="sm">
+    <Modal open={open} onClose={close} title={title ?? t('cashAccVoidTitle')} size="sm">
       <Form noValidate onSubmit={event => {
         event.preventDefault()
         setSubmitted(true)
@@ -49,7 +53,7 @@ export default function VoidReasonModal({ open, onClose, onConfirm, pending, sum
         <div className="flex gap-3 pt-1">
           <button type="button" onClick={close} disabled={pending} className="flex-1 py-2.5 border border-border text-muted-foreground text-sm rounded-xl hover:bg-muted">{t('actionCancel')}</button>
           <button type="submit" disabled={pending} className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-xl disabled:opacity-60">
-            {pending ? t('loading') : t('cashAccVoidConfirm')}
+            {pending ? t('loading') : (confirmLabel ?? t('cashAccVoidConfirm'))}
           </button>
         </div>
       </Form>
