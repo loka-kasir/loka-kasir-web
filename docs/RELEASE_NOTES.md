@@ -1,6 +1,6 @@
 # Release 1.13.0 — 28 November 2026
 
-Memerlukan backend **1.14.0**; sejalan dengan aplikasi **1.61.0+16100**. Aman
+Memerlukan backend **1.14.0**; sejalan dengan aplikasi **1.61.1+16101**. Aman
 dipasang sebelum backend: tanpa `GET /payment-order/methods` pembayaran jatuh
 ke halaman checkout Duitku seperti sebelumnya.
 
