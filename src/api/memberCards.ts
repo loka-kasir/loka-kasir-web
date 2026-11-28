@@ -124,6 +124,7 @@ export const assignMemberCard = (
     email?: string
     notes?: string
     replace_existing?: boolean
+    allow_duplicate_phone?: boolean
   },
 ) =>
   api.post<{ status: boolean; data: MemberCardLookupResult }>(

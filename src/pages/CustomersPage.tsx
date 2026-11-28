@@ -62,9 +62,7 @@ export default function CustomersPage() {
       label: t('navCustomers'),
       render: (row: Customer) => (
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-teal-50 rounded-full flex items-center justify-center text-teal-600 font-bold text-sm">
-            {row.name[0]?.toUpperCase()}
-          </div>
+          <CustomerAvatar name={row.name} url={row.photo_url} className="w-8 h-8 text-sm" />
           <p className="font-medium text-foreground">{row.name}</p>
           {row.is_member && <Badge variant="purple">{t('customerMember')}</Badge>}
         </div>
@@ -192,9 +190,7 @@ export default function CustomersPage() {
               customers.map((customer) => (
                 <article key={customer.id} className="p-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-teal-50 rounded-full flex items-center justify-center text-teal-600 font-bold shrink-0">
-                      {customer.name[0]?.toUpperCase()}
-                    </div>
+                    <CustomerAvatar name={customer.name} url={customer.photo_url} className="w-10 h-10 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -265,6 +261,18 @@ export default function CustomersPage() {
       )}
 
       <MemberCardPoolModal open={showCardPool} onClose={() => setShowCardPool(false)} />
+    </div>
+  )
+}
+
+/** Foto wajah pelanggan bila ada, selain itu inisial. */
+function CustomerAvatar({ name, url, className = '' }: { name: string; url?: string | null; className?: string }) {
+  if (url) {
+    return <img src={url} alt="" loading="lazy" className={`${className} rounded-full object-cover bg-teal-50`} />
+  }
+  return (
+    <div className={`${className} bg-teal-50 rounded-full flex items-center justify-center text-teal-600 font-bold`}>
+      {name[0]?.toUpperCase()}
     </div>
   )
 }

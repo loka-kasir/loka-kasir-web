@@ -15,6 +15,10 @@ menamai perubahan yang sudah ter-deploy bersama aplikasi 1.58.0 – 1.60.1.
   slot; Kartu Member siap cetak (A4).
 
 **Perbaikan hasil audit 1.12.0**
+- **Pelanggan**: foto wajah tampil di daftar pelanggan (`photo_url`, dipasang
+  dari aplikasi). Aktivasi kartu dengan nomor HP yang sudah terdaftar
+  menawarkan menghubungkan ke pelanggan itu; form aktivasi menjelaskan efek
+  kartu ke harga member.
 - **Kartu member: desain tersimpan, cetak ulang, halaman kartu publik**
   (`MemberCardPoolModal.tsx`, `MemberCardPublicPage.tsx`, rute `/k/:business/:code`):
   desain dibaca dari server (sama dengan aplikasi) + tombol "Simpan desain

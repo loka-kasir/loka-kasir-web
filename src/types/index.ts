@@ -569,6 +569,8 @@ export interface Customer {
   points_balance: number
   /** Pelanggan bertanda member berhak atas diskon "Khusus member". */
   is_member?: boolean
+  /** Foto wajah pelanggan (dipasang dari aplikasi; sama dengan foto member gym). */
+  photo_url?: string | null
   created_at: string
   updated_at: string
 }

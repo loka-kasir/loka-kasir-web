@@ -352,14 +352,28 @@ export default function MemberCardPoolModal({
   })
 
   const assignMut = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!assignCard) throw new Error(t('mcpNoCardSelected'))
-      return assignMemberCard(assignCard.id, {
+      const body = {
         create_customer: true,
         name: newName.trim(),
         phone: newPhone.trim() || undefined,
         notes: newNotes.trim() || undefined,
-      })
+      }
+      try {
+        return await assignMemberCard(assignCard.id, body)
+      } catch (err) {
+        // Nomor HP milik pelanggan lama: tawarkan menghubungkan kartu ke
+        // pelanggan itu supaya poin & riwayatnya tidak terpecah.
+        const res = (err as { response?: { status?: number; data?: { error?: { code?: string }; data?: { customer_id?: string; name?: string } } } }).response
+        const dup = res?.status === 409 && res.data?.error?.code === 'MEMBER_CARD_PHONE_EXISTS' ? res.data.data : undefined
+        if (!dup?.customer_id) throw err
+        if (confirm(t('mcpPhoneExistsLink', { name: dup.name ?? '' }))) {
+          return assignMemberCard(assignCard.id, { create_customer: false, customer_id: dup.customer_id })
+        }
+        if (!confirm(t('mcpPhoneExistsCreateNew'))) throw new Error(t('mcpPhoneExistsCancelled'), { cause: err })
+        return assignMemberCard(assignCard.id, { ...body, allow_duplicate_phone: true })
+      }
     },
     onSuccess: () => {
       toast.success(t('mcpActivatedToast', { serial: assignCard?.serial_label ?? '' }))
@@ -753,6 +767,9 @@ export default function MemberCardPoolModal({
                   <X size={16} />
                 </button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                {isGym ? t('mcpAssignNoteGym') : t('mcpAssignNoteGeneral')}
+              </p>
               <div className="grid sm:grid-cols-3 gap-2">
                 <input
                   type="text"
