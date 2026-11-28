@@ -562,3 +562,9 @@ export const getPublicRating = (token: string, bill?: string) =>
 
 export const submitPublicRating = (token: string, payload: PublicRatingPayload) =>
   publicApi.post<ApiResponse<{ ok: boolean }>>(`/public/rating/${encodeURIComponent(token)}`, payload)
+
+// ─── Kartu member cetak (QR kartu → halaman ini, public, no auth) ──────────
+export const getPublicMemberCard = (businessId: string, code: string) =>
+  publicApi.get<ApiResponse<import('@/api/memberCards').PublicMemberCard>>(
+    `/public/kartu/${encodeURIComponent(businessId)}/${encodeURIComponent(code)}`,
+  )

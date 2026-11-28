@@ -15,6 +15,12 @@ menamai perubahan yang sudah ter-deploy bersama aplikasi 1.58.0 – 1.60.1.
   slot; Kartu Member siap cetak (A4).
 
 **Perbaikan hasil audit 1.12.0**
+- **Kartu member: desain tersimpan, cetak ulang, halaman kartu publik**
+  (`MemberCardPoolModal.tsx`, `MemberCardPublicPage.tsx`, rute `/k/:business/:code`):
+  desain dibaca dari server (sama dengan aplikasi) + tombol "Simpan desain
+  kartu"; mencetak ikut menyimpan desain; tombol "Cetak ulang" per kartu
+  terpakai; QR cetak memakai `qr_url`. Halaman publik menampilkan saldo
+  titipan, poin, tingkat, dan masa aktif gym pemegang kartu.
 - **Kartu member cetak** (`MemberCardPoolModal.tsx`): watermark "powered by
   lokakasir.id" di pratinjau dan lembar cetak kini diawali logo kecil Loka Kasir
   (`/icon-current.svg`), sama dengan PDF aplikasi.

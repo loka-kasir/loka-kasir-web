@@ -29,6 +29,7 @@ const PublicMenuPage       = lazy(() => import('@/pages/public/PublicMenuPage'))
 const OrderCheckPage       = lazy(() => import('@/pages/public/OrderCheckPage'))
 const BalanceCheckPage     = lazy(() => import('@/pages/public/BalanceCheckPage'))
 const BalanceQrPage        = lazy(() => import('@/pages/public/BalanceQrPage'))
+const MemberCardPublicPage = lazy(() => import('@/pages/public/MemberCardPublicPage'))
 const RatingPage           = lazy(() => import('@/pages/public/RatingPage'))
 const PublicBookingPage    = lazy(() => import('@/pages/public/PublicBookingPage'))
 const PublicBookingManagePage = lazy(() => import('@/pages/public/PublicBookingManagePage'))
@@ -322,6 +323,18 @@ export default function App() {
           <ErrorBoundary>
             <Suspense fallback={<PageFallback />}>
               <RatingPage />
+            </Suspense>
+          </ErrorBoundary>
+        }
+      />
+
+      {/* QR kartu member cetak: saldo & poin pemegang kartu — no auth */}
+      <Route
+        path="/k/:business/:code"
+        element={
+          <ErrorBoundary>
+            <Suspense fallback={<PageFallback />}>
+              <MemberCardPublicPage />
             </Suspense>
           </ErrorBoundary>
         }

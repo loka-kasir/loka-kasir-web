@@ -12,6 +12,9 @@ import {
   listAllMemberCards,
   type MemberCardPoolItem,
   unassignMemberCard,
+  getMemberCardDesign,
+  saveMemberCardDesign,
+  type MemberCardDesign,
 } from '@/api/memberCards'
 import { getOutletConfig } from '@/api/outlets'
 import { useAuthStore } from '@/store/authStore'
@@ -104,7 +107,7 @@ async function openPrintableCardSheet(opts: {
     cards.map(async (card) => {
       const qr =
         codeStyle === 'both' || codeStyle === 'qr'
-          ? await QRCode.toDataURL(card.qr_payload, { margin: 1, width: 160 })
+          ? await QRCode.toDataURL(card.qr_url || card.qr_payload, { margin: 1, width: 160 })
           : ''
       const bar =
         codeStyle === 'both' || codeStyle === 'barcode'
@@ -263,6 +266,69 @@ export default function MemberCardPoolModal({
   const [newNotes, setNewNotes] = useState('')
 
   const storeInfo = storeInfoOverride ?? defaultStoreInfo
+
+  // Desain tersimpan usaha ini (sama dengan aplikasi): diatur sekali, dipakai
+  // setiap cetak — batch baru & cetak ulang tampil sama.
+  const { data: designData } = useQuery({
+    queryKey: ['member-card-design'],
+    queryFn: () => getMemberCardDesign(),
+    enabled: open,
+  })
+  const savedDesign = designData?.data?.data
+  // Terapkan desain tersimpan sekali setiap datanya berubah (pola "sesuaikan
+  // state saat render", bukan efek).
+  const [appliedDesign, setAppliedDesign] = useState<MemberCardDesign | undefined>()
+  if (savedDesign?.saved && savedDesign !== appliedDesign) {
+    setAppliedDesign(savedDesign)
+    setTemplate(savedDesign.template)
+    setAccent(savedDesign.accent)
+    setCodeStyle(savedDesign.code_style)
+    setPurpose(savedDesign.purpose)
+    setShowLogo(savedDesign.show_logo)
+    setStoreInfoOverride(savedDesign.store_info ?? '')
+    setCustomTagline(savedDesign.tagline ?? '')
+  }
+  const currentDesign: MemberCardDesign = {
+    template,
+    accent,
+    code_style: codeStyle,
+    purpose,
+    show_logo: showLogo,
+    store_info: storeInfo,
+    tagline: customTagline,
+  }
+  const designDirty =
+    !savedDesign?.saved ||
+    savedDesign.template !== template ||
+    savedDesign.accent !== accent ||
+    savedDesign.code_style !== codeStyle ||
+    savedDesign.purpose !== purpose ||
+    savedDesign.show_logo !== showLogo ||
+    (savedDesign.store_info ?? '') !== storeInfo.trim() ||
+    (savedDesign.tagline ?? '') !== customTagline.trim()
+  const saveDesignMut = useMutation({
+    mutationFn: () => saveMemberCardDesign(currentDesign),
+    onSuccess: () => {
+      toast.success(t('mcpDesignSaved'))
+      qc.invalidateQueries({ queryKey: ['member-card-design'] })
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+  const printCards = (cards: MemberCardPoolItem[]) => {
+    if (can(PERMS.CUSTOMER_MANAGE) && designDirty) saveDesignMut.mutate()
+    void openPrintableCardSheet({
+      cards,
+      businessName,
+      logoUrl,
+      showLogo,
+      storeInfo,
+      purpose,
+      template,
+      accent,
+      codeStyle,
+      tagline: customTagline,
+    })
+  }
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['member-cards', status, search],
@@ -615,23 +681,20 @@ export default function MemberCardPoolModal({
                 onChange={(e) => setCustomTagline(e.target.value)}
                 className="w-full px-3 py-1.5 text-xs border border-border rounded-lg bg-card"
               />
+              {can(PERMS.CUSTOMER_MANAGE) && (
+                <button
+                  type="button"
+                  disabled={!designDirty || saveDesignMut.isPending}
+                  onClick={() => saveDesignMut.mutate()}
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-lg border border-border hover:bg-muted disabled:opacity-50"
+                >
+                  {designDirty ? t('mcpDesignSave') : t('mcpDesignSavedState')}
+                </button>
+              )}
               <button
                 type="button"
                 disabled={printableCards.length === 0}
-                onClick={() =>
-                  void openPrintableCardSheet({
-                    cards: printableCards,
-                    businessName,
-                    logoUrl,
-                    showLogo,
-                    storeInfo,
-                    purpose,
-                    template,
-                    accent,
-                    codeStyle,
-                    tagline: customTagline,
-                  })
-                }
+                onClick={() => printCards(printableCards)}
                 className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-50"
               >
                 <Printer size={14} /> {t('mcpPrintButton', { count: printableCards.length })}
@@ -790,6 +853,16 @@ export default function MemberCardPoolModal({
                         className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50"
                       >
                         <UserPlus size={13} /> {t('mcpRegister')}
+                      </button>
+                    )}
+                    {card.status === 'assigned' && (
+                      <button
+                        type="button"
+                        onClick={() => printCards([card])}
+                        title={t('mcpReprintTitle')}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-border text-foreground hover:bg-muted"
+                      >
+                        <Printer size={13} /> {t('mcpReprint')}
                       </button>
                     )}
                     {card.status === 'assigned' && can(PERMS.CUSTOMER_MANAGE) && (

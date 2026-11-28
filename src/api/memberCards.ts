@@ -6,6 +6,8 @@ export interface MemberCardPoolItem {
   serial_label: string
   card_code: string
   qr_payload: string
+  /** Tautan kartu (`<web>/k/<usaha>/<kode>`) untuk QR cetak; kosong di server lama. */
+  qr_url?: string
   status: 'available' | 'assigned' | 'blocked'
   batch_label?: string
   note?: string
@@ -136,3 +138,37 @@ export const blockMemberCard = (cardId: string, note?: string) =>
   api.post<{ status: boolean; data: MemberCardPoolItem }>(`/member-cards/${cardId}/block`, {
     note,
   })
+
+/** Desain kartu cetak per usaha — diatur sekali, dipakai setiap cetak. */
+export interface MemberCardDesign {
+  template: 'classic' | 'dark' | 'minimal'
+  accent: 'blue' | 'emerald' | 'espresso' | 'charcoal' | 'crimson'
+  code_style: 'both' | 'qr' | 'barcode'
+  purpose: 'general' | 'gym'
+  show_logo: boolean
+  store_info?: string | null
+  tagline?: string | null
+  saved?: boolean
+}
+
+export const getMemberCardDesign = () =>
+  api.get<{ status: boolean; data: MemberCardDesign }>('/member-cards/design')
+
+export const saveMemberCardDesign = (data: MemberCardDesign) =>
+  api.put<{ status: boolean; data: MemberCardDesign }>('/member-cards/design', data)
+
+/** Halaman kartu publik — dibuka kamera HP pelanggan dari QR kartu. */
+export interface PublicMemberCard {
+  business_name: string
+  logo_url?: string
+  serial_label?: string
+  card_code: string
+  status: 'available' | 'assigned' | 'blocked' | 'unregistered'
+  member_name?: string
+  deposit_balance?: number
+  points_balance?: number
+  tier_name?: string
+  gym_status?: string
+  gym_plan_name?: string
+  gym_end_date?: string
+}
