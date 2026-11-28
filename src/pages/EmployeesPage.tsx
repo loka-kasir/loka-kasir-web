@@ -14,7 +14,8 @@ import UserQuotaSection, { UserAddonPickerModal } from '@/components/membership/
 import PaymentOrderModal from '@/components/ui/PaymentOrderModal'
 import { getEmployees, deleteEmployee } from '@/api/employees'
 import { getActiveMembership } from '@/api/membership'
-import { createPaymentOrder } from '@/api/payment'
+import { createPaymentOrder, type CreatePaymentOrderPayload } from '@/api/payment'
+import { usePaymentMethodPicker, PaymentPickCancelled } from '@/components/ui/PaymentMethodPicker'
 import { getShiftSchedules } from '@/api/shifts'
 import { getRoles } from '@/api/master'
 import { useAuthStore } from '@/store/authStore'
@@ -53,14 +54,19 @@ export default function EmployeesPage({ embedded = false }: { embedded?: boolean
   })
   const userQuota = membershipData?.data?.data?.user_quota ?? null
 
+  const methodPicker = usePaymentMethodPicker()
   const createAddonOrderMut = useMutation({
-    mutationFn: createPaymentOrder,
+    // Kanal Duitku dipilih dulu (API v2); kosong → halaman checkout Duitku.
+    mutationFn: async (payload: CreatePaymentOrderPayload) => {
+      const payment_method = await methodPicker.pick()
+      return createPaymentOrder(payment_method ? { ...payload, payment_method } : payload)
+    },
     onSuccess: (res) => {
       setPaymentOrder(res.data.data)
       setPaymentOpen(true)
     },
     onError: (err) => {
-      toast.error(getErrorMessage(err))
+      if (!(err instanceof PaymentPickCancelled)) toast.error(getErrorMessage(err))
       if (pendingEmployeeName) {
         toast(t('uqSavedInactivePending', { name: pendingEmployeeName }))
         setPendingEmployeeName(null)
@@ -305,6 +311,7 @@ export default function EmployeesPage({ embedded = false }: { embedded?: boolean
         />
       )}
 
+      {methodPicker.element}
       <PaymentOrderModal
         open={paymentOpen}
         order={paymentOrder}

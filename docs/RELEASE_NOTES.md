@@ -1,3 +1,24 @@
+# Release 1.13.0 — 28 November 2026
+
+Memerlukan backend **1.14.0**; sejalan dengan aplikasi **1.61.0+16100**. Aman
+dipasang sebelum backend: tanpa `GET /payment-order/methods` pembayaran jatuh
+ke halaman checkout Duitku seperti sebelumnya.
+
+**Pembayaran langganan lewat Duitku API v2**
+- `PaymentMethodPicker.tsx` (`usePaymentMethodPicker`): sebelum tagihan dibuat
+  di Membership & Karyawan, pemilik memilih kanal (QRIS, E-Wallet, VA, Gerai,
+  Kartu) dari `GET /payment-order/methods`; `payment_method` dikirim ke
+  `POST /payment-order`. Menutup pemilih = tidak ada tagihan, tanpa toast galat.
+  Gagal memuat daftar → halaman checkout Duitku.
+- `PaymentOrderModal.tsx`: QRIS dirender (`qrcode`) dengan tombol Unduh QR, VA
+  dengan tombol Salin; "Bayar Sekarang" jadi tautan "Buka halaman pembayaran"
+  untuk kanal itu. Kotak "metode tersedia" hanya untuk halaman checkout.
+- `lib/axios.ts`: respons `/payment-order/methods` tidak di-title-case
+  (merusak "ShopeePay QRIS" menjadi "Shopeepay Qris").
+- Tipe `PaymentOrder`: `payment_method`, `va_number`, `qr_string`.
+
+---
+
 # Release 1.12.0 — 28 November 2026
 
 Memerlukan backend **1.13.0**; sejalan dengan aplikasi **1.60.2+16002**. Juga

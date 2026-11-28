@@ -12,7 +12,27 @@ export interface CreatePaymentOrderPayload {
   months?: number
   /** Email customer untuk notifikasi pembayaran Duitku. */
   email?: string
+  /**
+   * Kode kanal Duitku dari `getPaymentMethods` (mis. "SP" untuk QRIS). Diisi →
+   * tagihan dibuat lewat Duitku API v2 dan respons membawa `qr_string` /
+   * `va_number`. Kosong → halaman checkout Duitku.
+   */
+  payment_method?: string
 }
+
+/** Satu kanal pembayaran Duitku yang aktif. */
+export interface PaymentMethodOption {
+  code: string
+  name: string
+  image: string
+  group: 'va' | 'qris' | 'ewallet' | 'retail' | 'card'
+  fee: number
+}
+
+export const getPaymentMethods = (amount?: number) =>
+  api.get<ApiResponse<PaymentMethodOption[]>>('/payment-order/methods', {
+    params: amount ? { amount } : undefined,
+  })
 
 export const createPaymentOrder = (data: CreatePaymentOrderPayload) =>
   api.post<ApiResponse<PaymentOrder>>('/payment-order', data)

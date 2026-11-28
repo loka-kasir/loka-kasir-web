@@ -17,7 +17,8 @@ import type { BillingCycle } from '@/components/membership/BillingToggle'
 import { ProPlanCard } from '@/components/membership/PlanCard'
 import { getMyOutlets, createOutlet, deleteOutlet } from '@/api/outlets'
 import { getActiveMembership, getUpgradePreview } from '@/api/membership'
-import { createPaymentOrder } from '@/api/payment'
+import { createPaymentOrder, type CreatePaymentOrderPayload } from '@/api/payment'
+import { usePaymentMethodPicker, PaymentPickCancelled } from '@/components/ui/PaymentMethodPicker'
 import GymMemberQuotaSection from '@/pages/membership/GymMemberQuotaSection'
 import { formatDate, getErrorMessage } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -149,8 +150,13 @@ export default function MembershipPage() {
   const [userAddonTitle, setUserAddonTitle] = useState('')
 
   // ── Buat payment order (dipakai untuk membership & outlet add-on) ──────────
+  const methodPicker = usePaymentMethodPicker()
   const createOrderMut = useMutation({
-    mutationFn: createPaymentOrder,
+    // Kanal Duitku dipilih dulu (API v2); kosong → halaman checkout Duitku.
+    mutationFn: async (payload: CreatePaymentOrderPayload) => {
+      const payment_method = await methodPicker.pick()
+      return createPaymentOrder(payment_method ? { ...payload, payment_method } : payload)
+    },
     onSuccess: (res, vars) => {
       void qc.invalidateQueries({ queryKey: ['referral'] })
       setPaymentOrder(res.data.data)
@@ -171,7 +177,7 @@ export default function MembershipPage() {
       }
     },
     onError: (err) => {
-      toast.error(getErrorMessage(err))
+      if (!(err instanceof PaymentPickCancelled)) toast.error(getErrorMessage(err))
       setUpgradeTarget(null)
     },
   })
@@ -484,6 +490,7 @@ export default function MembershipPage() {
       />
 
       {/* ── Payment Order Modal ───────────────────────────────────────────── */}
+      {methodPicker.element}
       <PaymentOrderModal
         open={paymentOrderOpen}
         order={paymentOrder}

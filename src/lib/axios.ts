@@ -43,6 +43,9 @@ function normalizeResponse(response: import('axios').AxiosResponse) {
   // Catalog category names are also exact-match search keys; format their
   // labels at render time instead of replacing the values sent back to search.
   if (response.config.url?.split('?')[0].endsWith('/product/catalog/categories')) return response
+  // Nama kanal Duitku sudah ditulis rapi di server ("ShopeePay QRIS", "BNI VA");
+  // title case akan merusak singkatan menjadi "Shopeepay Qris".
+  if (response.config.url?.split('?')[0].endsWith('/payment-order/methods')) return response
   response.data = normalizeTextData(response.data, 'display')
   return response
 }

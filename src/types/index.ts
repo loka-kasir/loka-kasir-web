@@ -1175,6 +1175,12 @@ export interface PaymentOrder {
   duitku_reference: string | null
   /** URL halaman checkout Duitku yang dibuka oleh user untuk membayar. */
   payment_url: string | null
+  /** Kode kanal Duitku API v2 yang dipilih; null untuk halaman checkout Duitku. */
+  payment_method?: string | null
+  /** Nomor virtual account (kanal VA, API v2). */
+  va_number?: string | null
+  /** Teks QRIS untuk dibuat gambar QR (kanal QRIS, API v2). */
+  qr_string?: string | null
   expired_at: string
   paid_at: string | null
   created_at: string

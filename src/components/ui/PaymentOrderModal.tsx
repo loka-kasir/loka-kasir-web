@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  CheckCircle2, Clock, AlertTriangle, ExternalLink, RefreshCw, CreditCard,
+  CheckCircle2, Clock, AlertTriangle, ExternalLink, RefreshCw, CreditCard, Copy, Download,
 } from 'lucide-react'
+import QRCode from 'qrcode'
 import Modal from '@/components/ui/Modal'
 import { getPaymentOrder } from '@/api/payment'
 import type { PaymentOrder } from '@/types'
@@ -73,6 +74,64 @@ function CountdownBadge({ expiredAt }: { expiredAt: string }) {
       <Clock size={14} className="shrink-0" />
       {pad(hours)}:{pad(minutes)}:{pad(seconds)}
     </span>
+  )
+}
+
+// ─── QRIS / VA (Duitku API v2) ────────────────────────────────────────────────
+
+function QrisBlock({ qrString, orderId }: { qrString: string; orderId: string }) {
+  const [src, setSrc] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    QRCode.toDataURL(qrString, { width: 480, margin: 2, errorCorrectionLevel: 'M' })
+      .then((url) => { if (alive) setSrc(url) })
+      .catch(() => { if (alive) setSrc(null) })
+    return () => { alive = false }
+  }, [qrString])
+  return (
+    <div className="flex flex-col items-center gap-2 bg-white rounded-xl border border-border p-4">
+      {src ? (
+        <img src={src} alt="QRIS" className="w-56 h-56" />
+      ) : (
+        <div className="w-56 h-56 animate-pulse bg-gray-100 rounded" />
+      )}
+      <p className="text-xs text-gray-600 text-center">{t('payScanQris')}</p>
+      {src && (
+        <a
+          href={src}
+          download={`qris-${orderId.slice(0, 8)}.png`}
+          className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
+        >
+          <Download size={12} /> {t('payDownloadQr')}
+        </a>
+      )}
+    </div>
+  )
+}
+
+function VaBlock({ vaNumber }: { vaNumber: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(vaNumber)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard tidak tersedia */ }
+  }
+  return (
+    <div className="bg-muted border border-border rounded-xl p-4">
+      <p className="text-xs text-muted-foreground mb-1">{t('payVaNumber')}</p>
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-lg font-bold tracking-wider text-foreground break-all">{vaNumber}</span>
+        <button
+          type="button"
+          onClick={copy}
+          className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline shrink-0"
+        >
+          <Copy size={12} /> {copied ? t('payCopied') : t('payCopy')}
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -166,6 +225,8 @@ export default function PaymentOrderModal({
     onClose()
   }
 
+  const hasInlinePayment = !!(order.qr_string || order.va_number)
+
   const openPaymentPage = () => {
     if (order.payment_url) {
       window.open(order.payment_url, '_blank', 'noopener,noreferrer')
@@ -256,23 +317,41 @@ export default function PaymentOrderModal({
             )}
           </div>
 
-          {/* Tombol bayar via Duitku */}
-          <button
-            onClick={openPaymentPage}
-            disabled={!order.payment_url}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-muted text-white text-sm font-bold rounded-xl transition flex items-center justify-center gap-2"
-          >
-            <ExternalLink size={15} />
-            {t('payNow')}
-          </button>
+          {/* Duitku API v2: QR / VA langsung di sini */}
+          {order.qr_string && <QrisBlock qrString={order.qr_string} orderId={order.id} />}
+          {order.va_number && <VaBlock vaNumber={order.va_number} />}
 
-          {/* Info metode pembayaran */}
-          <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3">
-            <p className="text-xs text-blue-700 dark:text-blue-400 font-semibold mb-1.5">{t('payMethodsAvailable')}</p>
-            <p className="text-xs text-blue-600 dark:text-blue-400 leading-relaxed">
-              {t('payMethodsList')}
-            </p>
-          </div>
+          {/* Tombol bayar via halaman Duitku (e-wallet, atau cadangan QR/VA) */}
+          {hasInlinePayment ? (
+            order.payment_url && (
+              <button
+                onClick={openPaymentPage}
+                className="w-full py-2 text-blue-600 dark:text-blue-400 text-xs font-semibold hover:underline flex items-center justify-center gap-1.5"
+              >
+                <ExternalLink size={12} />
+                {t('payOpenPaymentPage')}
+              </button>
+            )
+          ) : (
+            <button
+              onClick={openPaymentPage}
+              disabled={!order.payment_url}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-muted text-white text-sm font-bold rounded-xl transition flex items-center justify-center gap-2"
+            >
+              <ExternalLink size={15} />
+              {t('payNow')}
+            </button>
+          )}
+
+          {/* Info metode pembayaran — hanya untuk halaman checkout Duitku */}
+          {!order.payment_method && (
+            <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3">
+              <p className="text-xs text-blue-700 dark:text-blue-400 font-semibold mb-1.5">{t('payMethodsAvailable')}</p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 leading-relaxed">
+                {t('payMethodsList')}
+              </p>
+            </div>
+          )}
 
           {/* Catatan */}
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground leading-relaxed">
